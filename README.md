@@ -87,4 +87,8 @@ Operation complete.
 
 ## 🤝 Contributing
 
-Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/frederickabrah/PyGitUp/issues). (You would update this link after you create the repository).
+Contributions, issues, and feature requests are welcome!
+
+IF YOU ENJOY IT AND WANT TO APPRECIATE YOU CAN BUY ME A COFFEE 
+
+THANKS
