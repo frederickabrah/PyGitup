@@ -12,13 +12,19 @@ This tool streamlines your entire GitHub workflow, whether you're pushing a bran
 
 ## ✨ Key Features
 
--   ✅ **Dual-Mode Operation:**
+-   ✅ **Triple-Mode Operation:**
     -   **Project Mode:** Upload an entire project directory. `PyGitUp` initializes a git repo, creates the remote on GitHub, and pushes your code in one go.
     -   **File Mode:** Upload or overwrite a single file directly using the GitHub API. Perfect for quick updates.
--   ✅ **Interactive & Smart:**
+    -   **Batch Mode:** Upload multiple files at once with a single command.
+-   ✅ **Flexible Configuration:**
+    -   Command-line arguments for automated usage
+    -   Configuration file support (`pygitup.yaml`) for default settings
+    -   Environment variable support for credentials
+-   ✅ **Enhanced User Experience:**
     -   A clean, interactive menu to choose your workflow.
     -   A file selector that lists files in your current directory for easy selection.
-    -   Remembers your credentials for the session and can use environment variables for convenience.
+    -   Progress bars for long operations
+    -   Detailed logging capabilities
 -   ✅ **User-Friendly:**
     -   Securely prompts for your GitHub Personal Access Token.
     -   Handles existing repositories and non-empty remotes gracefully with a force-push option.
@@ -36,7 +42,8 @@ Enter your GitHub Personal Access Token:
 What would you like to do?
 1: Upload/update a whole project directory
 2: Upload/update a single file
-Enter your choice (1 or 2): 2
+3: Batch upload multiple files
+Enter your choice (1, 2, or 3): 2
 
 Enter the name of the target GitHub repository: My-Awesome-Project
 
@@ -70,20 +77,53 @@ Operation complete.
 
 ## 🚀 Usage
 
-1.  **Generate a GitHub Personal Access Token (PAT):**
-    -   Go to [github.com/settings/tokens](https://github.com/settings/tokens).
-    -   Generate a new token with the full `repo` scope.
-    -   **Copy this token!** You'll need it to run the script.
-2.  **Run the script:**
-    ```bash
-    python pygitup.py
-    ```
-3.  **Follow the on-screen prompts!**
-    -   **Pro Tip:** For even faster use, set your credentials as environment variables:
-        ```bash
-        export GITHUB_USERNAME="frederickabrah"
-        export GITHUB_TOKEN="your-pat"
-        ```
+### Interactive Mode
+Simply run the script and follow the prompts:
+```bash
+python pygitup.py
+```
+
+### Command-Line Mode
+For automated usage, use command-line arguments:
+```bash
+# Upload a single file
+python pygitup.py --mode file --repo My-Awesome-Project --file main.py --path src/main.py --message "Update main module"
+
+# Upload an entire project
+python pygitup.py --mode project --path ./myproject --repo My-Awesome-Project --private
+
+# Batch upload multiple files
+python pygitup.py --mode batch --repo My-Awesome-Project --files "file1.py,file2.py,file3.py" --path src/
+```
+
+### Configuration File
+Create a `pygitup.yaml` file in your project directory or home directory:
+```yaml
+defaults:
+  commit_message: "Update from PyGitUp"
+  branch: "main"
+  
+github:
+  username: "your-username"  # Optional, can use GITHUB_USERNAME env var
+  token_file: "~/.github-token"  # More secure than environment variables
+  default_description: "Repository created with PyGitUp"
+  default_private: false
+
+batch:
+  continue_on_error: false
+
+logging:
+  enabled: true
+  file: "pygitup.log"
+  level: "INFO"
+```
+
+### Environment Variables
+For even faster use, set your credentials as environment variables:
+```bash
+export GITHUB_USERNAME="frederickabrah"
+export GITHUB_TOKEN="your-pat"
+```
 
 ## 🤝 Contributing
 

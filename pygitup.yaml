@@ -1,0 +1,45 @@
+# PyGitUp Configuration File
+# This file contains default settings and preferences for PyGitUp
+
+defaults:
+  commit_message: "Update from PyGitUp"
+  branch: "main"
+  
+github:
+  # You can specify your username here, or use GITHUB_USERNAME environment variable
+  username: ""
+  
+  # Path to a file containing your GitHub token (more secure than environment variables)
+  # The file should contain only the token, nothing else
+  token_file: ""
+  
+  # Default repository settings
+  default_description: "Repository created with PyGitUp"
+  default_private: false
+
+# Batch upload settings
+batch:
+  # Maximum number of files to upload in a single batch operation
+  max_files: 100
+  
+  # Whether to continue on error during batch operations
+  continue_on_error: false
+
+# Performance settings
+performance:
+  # Number of parallel uploads for batch operations
+  max_parallel_uploads: 5
+  
+  # Timeout for API requests (in seconds)
+  timeout: 30
+
+# Logging settings
+logging:
+  # Enable detailed logging
+  enabled: false
+  
+  # Log file path
+  file: "pygitup.log"
+  
+  # Log level (DEBUG, INFO, WARNING, ERROR)
+  level: "INFO"
