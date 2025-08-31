@@ -8,8 +8,11 @@ import yaml
 import json
 import sys
 import time
+import re
+import hashlib
 from pathlib import Path
 from tqdm import tqdm
+from datetime import datetime
 
 # Try to import optional dependencies
 try:
@@ -48,6 +51,31 @@ DEFAULT_CONFIG = {
         "enabled": False,
         "file": "pygitup.log",
         "level": "INFO"
+    },
+    "templates": {
+        "directory": "./templates"
+    },
+    "scheduling": {
+        "offline_queue_file": ".pygitup_offline_queue"
+    }
+}
+
+# Template definitions
+DEFAULT_TEMPLATES = {
+    "web-app": {
+        "files": {
+            "index.html": "<!DOCTYPE html>\\n<html>\\n<head>\\n    <title>{{PROJECT_NAME}}</title>\\n</head>\\n<body>\\n    <h1>Welcome to {{PROJECT_NAME}}</h1>\\n    <p>Created with PyGitUp</p>\\n</body>\\n</html>",
+            "style.css": "body {\\n    font-family: Arial, sans-serif;\\n    margin: 40px;\\n}",
+            "README.md": "# {{PROJECT_NAME}}\\n\\n{{DESCRIPTION}}\\n\\n## Setup\\n\\n1. Clone this repository\\n2. Open `index.html` in your browser\\n\\nGenerated with PyGitUp"
+        }
+    },
+    "python-package": {
+        "files": {
+            "__init__.py": "",
+            "main.py": "#!/usr/bin/env python3\\n\\n\\\"\\\"\\\"{{PROJECT_NAME}} - {{DESCRIPTION}}\\\"\\\"\\\"\\n\\ndef main():\\n    print(\\\"Hello from {{PROJECT_NAME}}!\\\")\\n\\nif __name__ == \\\"__main__\\\":\\n    main()",
+            "setup.py": "from setuptools import setup, find_packages\\n\\nsetup(\\n    name=\\\"{{PROJECT_NAME}}\\\",\\n    version=\\\"0.1.0\\\",\\n    packages=find_packages(),\\n    install_requires=[],\\n    entry_points={\\n        'console_scripts': [\\n            '{{PROJECT_NAME}}=main:main'\\n        ]\\n    }\\n)",
+            "README.md": "# {{PROJECT_NAME}}\\n\\n{{DESCRIPTION}}\\n\\n## Installation\\n\\n```bash\\npip install .\\n```\\n\\n## Usage\\n\\n```bash\\n{{PROJECT_NAME}}\\n```"
+        }
     }
 }
 
@@ -131,7 +159,7 @@ def log_message(message, level="INFO", config=None):
         return
     
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-    log_entry = f"[{timestamp}] {level}: {message}\n"
+    log_entry = f"[{timestamp}] {level}: {message}\\n"
     
     try:
         with open(config["logging"]["file"], "a") as f:
@@ -140,7 +168,95 @@ def log_message(message, level="INFO", config=None):
         pass  # Silently fail on logging errors
 
 # ==============================================================================
-# SECTION 1: UPLOAD/UPDATE A SINGLE FILE
+# GITHUB API HELPER FUNCTIONS
+# ==============================================================================
+
+def get_github_headers(token):
+    """Create standard GitHub API headers."""
+    return {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+
+def get_repo_info(username, repo_name, token):
+    """Get repository information."""
+    url = f"https://api.github.com/repos/{username}/{repo_name}"
+    headers = get_github_headers(token)
+    response = requests.get(url, headers=headers)
+    return response
+
+def create_repo(username, repo_name, token, description="", private=False):
+    """Create a new GitHub repository."""
+    url = "https://api.github.com/user/repos"
+    headers = get_github_headers(token)
+    data = {
+        "name": repo_name,
+        "description": description,
+        "private": private
+    }
+    response = requests.post(url, headers=headers, json=data)
+    return response
+
+def get_file_info(username, repo_name, file_path, token):
+    """Get information about a file in a repository."""
+    url = f"https://api.github.com/repos/{username}/{repo_name}/contents/{file_path}"
+    headers = get_github_headers(token)
+    response = requests.get(url, headers=headers)
+    return response
+
+def update_file(username, repo_name, file_path, content, token, message, sha=None):
+    """Update or create a file in a repository."""
+    url = f"https://api.github.com/repos/{username}/{repo_name}/contents/{file_path}"
+    headers = get_github_headers(token)
+    encoded_content = base64.b64encode(content).decode('utf-8')
+    data = {
+        "message": message,
+        "content": encoded_content
+    }
+    if sha:
+        data["sha"] = sha
+    response = requests.put(url, headers=headers, json=data)
+    return response
+
+def get_commit_history(username, repo_name, token, path=None):
+    """Get commit history for a repository or specific file."""
+    url = f"https://api.github.com/repos/{username}/{repo_name}/commits"
+    headers = get_github_headers(token)
+    params = {}
+    if path:
+        params["path"] = path
+    response = requests.get(url, headers=headers, params=params)
+    return response
+
+def create_release(username, repo_name, token, tag_name, name, body=""):
+    """Create a new GitHub release."""
+    url = f"https://api.github.com/repos/{username}/{repo_name}/releases"
+    headers = get_github_headers(token)
+    data = {
+        "tag_name": tag_name,
+        "name": name,
+        "body": body,
+        "draft": False,
+        "prerelease": False
+    }
+    response = requests.post(url, headers=headers, json=data)
+    return response
+
+def create_issue(username, repo_name, token, title, body="", assignees=None):
+    """Create a new GitHub issue."""
+    url = f"https://api.github.com/repos/{username}/{repo_name}/issues"
+    headers = get_github_headers(token)
+    data = {
+        "title": title,
+        "body": body
+    }
+    if assignees:
+        data["assignees"] = assignees
+    response = requests.post(url, headers=headers, json=data)
+    return response
+
+# ==============================================================================
+# SECTION 1: DIRECT FILE UPDATES WITHOUT CLONING
 # ==============================================================================
 
 def get_single_file_input(config, args=None):
@@ -154,7 +270,7 @@ def get_single_file_input(config, args=None):
         local_file_path = args.file
         print(f"Selected file: {local_file_path}")
     else:
-        print("\n--- Select a file to upload ---")
+        print("\\n--- Select a file to upload ---")
         local_file_path = None
         try:
             current_directory = os.getcwd()
@@ -168,7 +284,7 @@ def get_single_file_input(config, args=None):
                 for i, filename in enumerate(files):
                     print(f"{i + 1}: {filename}")
                 
-                print("\nEnter the number of the file to upload, or type a different path manually.")
+                print("\\nEnter the number of the file to upload, or type a different path manually.")
                 choice = input("> ")
 
                 try:
@@ -286,7 +402,7 @@ def get_batch_files_input(config, args=None):
     if args and args.files:
         files = args.files
     else:
-        print("\n--- Select files for batch upload ---")
+        print("\\n--- Select files for batch upload ---")
         print("Enter file paths separated by commas, or 'all' for all files in directory:")
         files_input = input("> ").strip()
         
@@ -329,7 +445,7 @@ def upload_batch_files(github_username, github_token, config, args=None):
     if not files:
         return
     
-    print(f"\nUploading {len(files)} files to {repo_name}...")
+    print(f"\\nUploading {len(files)} files to {repo_name}...")
     
     # Use progress bar if available
     file_iterator = tqdm(files, desc="Uploading files") if TQDM_AVAILABLE else files
@@ -341,7 +457,7 @@ def upload_batch_files(github_username, github_token, config, args=None):
         try:
             # Determine repository path
             if repo_base_path:
-                repo_file_path = os.path.join(repo_base_path, os.path.basename(local_file)).replace("\\", "/")
+                repo_file_path = os.path.join(repo_base_path, os.path.basename(local_file)).replace("\\\\", "/")
             else:
                 repo_file_path = os.path.basename(local_file)
             
@@ -366,7 +482,7 @@ def upload_batch_files(github_username, github_token, config, args=None):
             if not config["batch"]["continue_on_error"]:
                 break
     
-    print(f"\nBatch upload complete: {success_count} succeeded, {fail_count} failed.")
+    print(f"\\nBatch upload complete: {success_count} succeeded, {fail_count} failed.")
 
 def upload_single_batch_file(github_username, github_token, repo_name, 
                            local_file_path, repo_file_path, commit_message, config):
@@ -412,7 +528,389 @@ def upload_single_batch_file(github_username, github_token, repo_name,
         return False
 
 # ==============================================================================
-# SECTION 3: UPLOAD/UPDATE A PROJECT DIRECTORY
+# SECTION 3: TEMPLATE-BASED PROJECT INITIALIZATION
+# ==============================================================================
+
+def get_template_input(config, args=None):
+    """Get template input from user or arguments."""
+    if args and args.template:
+        template_name = args.template
+    else:
+        print("\\n--- Available Templates ---")
+        for template in DEFAULT_TEMPLATES.keys():
+            print(f"- {template}")
+        template_name = input("Enter template name: ")
+    
+    if template_name not in DEFAULT_TEMPLATES:
+        print(f"Template '{template_name}' not found.")
+        return None, None, None, None
+    
+    if args and args.repo:
+        repo_name = args.repo
+    else:
+        repo_name = input("Enter repository name: ")
+    
+    # Get variables
+    variables = {}
+    if args and args.variables:
+        # Parse variables from command line
+        var_pairs = args.variables.split(",")
+        for pair in var_pairs:
+            if "=" in pair:
+                key, value = pair.split("=", 1)
+                variables[key.strip()] = value.strip()
+    
+    # Default variables
+    if "PROJECT_NAME" not in variables:
+        variables["PROJECT_NAME"] = repo_name
+    if "DESCRIPTION" not in variables:
+        variables["DESCRIPTION"] = "Project created with PyGitUp template"
+    if "AUTHOR" not in variables:
+        variables["AUTHOR"] = get_github_username(config)
+    
+    return template_name, repo_name, variables, DEFAULT_TEMPLATES[template_name]
+
+def create_project_from_template(github_username, github_token, config, args=None):
+    """Create a new project from a template."""
+    template_name, repo_name, variables, template = get_template_input(config, args)
+    
+    if not template_name:
+        return
+    
+    print(f"Creating project '{repo_name}' from template '{template_name}'...")
+    
+    # Create repository first
+    response = create_repo(
+        github_username, repo_name, github_token,
+        description=variables.get("DESCRIPTION", ""),
+        private=args.private if args and hasattr(args, 'private') else False
+    )
+    
+    if response.status_code not in [201, 200]:
+        print(f"Error creating repository: {response.status_code} - {response.text}")
+        return
+    
+    print(f"Repository '{repo_name}' created successfully.")
+    
+    # Create files from template
+    success_count = 0
+    for file_name, file_content in template["files"].items():
+        # Replace variables in file content
+        for var_name, var_value in variables.items():
+            file_content = file_content.replace(f"{{{{{var_name}}}}}", var_value)
+        
+        # Upload file
+        file_response = update_file(
+            github_username, repo_name, file_name,
+            file_content.encode('utf-8'), github_token,
+            f"Initial commit: {file_name}"
+        )
+        
+        if file_response.status_code in [201, 200]:
+            print(f"Created file: {file_name}")
+            success_count += 1
+        else:
+            print(f"Error creating file {file_name}: {file_response.status_code}")
+    
+    print(f"Template project created with {success_count} files.")
+    print(f"View your repository at: https://github.com/{github_username}/{repo_name}")
+
+# ==============================================================================
+# SECTION 4: AUTOMATED RELEASE MANAGEMENT
+# ==============================================================================
+
+def get_release_input(config, args=None):
+    """Get release input from user or arguments."""
+    if args and args.repo:
+        repo_name = args.repo
+    else:
+        repo_name = input("Enter repository name: ")
+    
+    if args and args.version:
+        version = args.version
+    else:
+        version = input("Enter version tag (e.g., v1.0.0): ")
+    
+    if args and args.name:
+        name = args.name
+    else:
+        default_name = f"Release {version}"
+        name_input = input(f"Enter release name (default: {default_name}): ")
+        name = name_input if name_input else default_name
+    
+    # Generate changelog if requested
+    changelog = ""
+    if args and args.generate_changelog:
+        changelog = generate_changelog(github_username, repo_name, github_token, version)
+    elif not args or not args.message:
+        changelog_input = input("Enter release notes (optional): ")
+        changelog = changelog_input
+    
+    return repo_name, version, name, changelog
+
+def generate_changelog(username, repo_name, token, version):
+    """Generate a changelog from commit history."""
+    try:
+        response = get_commit_history(username, repo_name, token)
+        if response.status_code == 200:
+            commits = response.json()
+            changelog = f"## Changelog for {version}\\n\\n"
+            for commit in commits[:20]:  # Last 20 commits
+                message = commit['commit']['message'].split('\\n')[0]
+                author = commit['commit']['author']['name']
+                date = commit['commit']['author']['date'][:10]
+                changelog += f"- {message} ({author} on {date})\\n"
+            return changelog
+        else:
+            return "Changelog generation failed."
+    except Exception as e:
+        return f"Changelog generation failed: {e}"
+
+def create_release_tag(github_username, github_token, config, args=None):
+    """Create a new GitHub release."""
+    repo_name, version, name, changelog = get_release_input(config, args)
+    
+    print(f"Creating release {version} for {repo_name}...")
+    
+    response = create_release(github_username, repo_name, github_token, version, name, changelog)
+    
+    if response.status_code == 201:
+        release_data = response.json()
+        print(f"Release created successfully!")
+        print(f"View release at: {release_data['html_url']}")
+    else:
+        print(f"Error creating release: {response.status_code} - {response.text}")
+
+# ==============================================================================
+# SECTION 5: MULTI-REPOSITORY OPERATIONS
+# ==============================================================================
+
+def get_multi_repo_input(config, args=None):
+    """Get multi-repository input."""
+    if args and args.multi_repo:
+        repo_names = [name.strip() for name in args.multi_repo.split(",")]
+    else:
+        repo_input = input("Enter repository names separated by commas: ")
+        repo_names = [name.strip() for name in repo_input.split(",")]
+    
+    if args and args.file:
+        file_path = args.file
+    else:
+        file_path = input("Enter local file to upload: ")
+    
+    if args and args.path:
+        repo_file_path = args.path
+    else:
+        repo_file_path = input("Enter repository file path: ")
+    
+    if args and args.message:
+        commit_message = args.message
+    else:
+        default_msg = config["defaults"]["commit_message"]
+        msg_input = input(f"Enter commit message (default: {default_msg}): ")
+        commit_message = msg_input if msg_input else default_msg
+    
+    return repo_names, file_path, repo_file_path, commit_message
+
+def update_multiple_repos(github_username, github_token, config, args=None):
+    """Update the same file across multiple repositories."""
+    repo_names, file_path, repo_file_path, commit_message = get_multi_repo_input(config, args)
+    
+    if not os.path.exists(file_path):
+        print(f"File '{file_path}' not found.")
+        return
+    
+    print(f"Updating {file_path} in {len(repo_names)} repositories...")
+    
+    try:
+        with open(file_path, "rb") as f:
+            file_content = f.read()
+    except Exception as e:
+        print(f"Error reading file: {e}")
+        return
+    
+    success_count = 0
+    for repo_name in repo_names:
+        try:
+            # Check if file exists to get SHA
+            response = get_file_info(github_username, repo_name, repo_file_path, github_token)
+            sha = None
+            if response.status_code == 200:
+                sha = response.json()['sha']
+            
+            # Update file
+            response = update_file(
+                github_username, repo_name, repo_file_path,
+                file_content, github_token, commit_message, sha
+            )
+            
+            if response.status_code in [200, 201]:
+                print(f"✓ Updated {repo_file_path} in {repo_name}")
+                success_count += 1
+            else:
+                print(f"✗ Failed to update {repo_file_path} in {repo_name}: {response.status_code}")
+        except Exception as e:
+            print(f"✗ Error updating {repo_name}: {e}")
+    
+    print(f"Multi-repository update complete: {success_count}/{len(repo_names)} successful.")
+
+# ==============================================================================
+# SECTION 6: AUTOMATED ISSUE CREATION FROM TODOs
+# ==============================================================================
+
+def scan_todos(github_username, github_token, config, args=None):
+    """Scan code for TODO comments and create GitHub issues."""
+    if args and args.repo:
+        repo_name = args.repo
+    else:
+        repo_name = input("Enter repository name: ")
+    
+    if args and args.pattern:
+        file_patterns = args.pattern.split(",")
+    else:
+        pattern_input = input("Enter file patterns (comma-separated, e.g., *.py,*.js): ")
+        file_patterns = pattern_input.split(",") if pattern_input else ["*.py"]
+    
+    assignees = []
+    if args and args.assign:
+        assignees = [name.strip() for name in args.assign.split(",")]
+    elif not args or not args.no_assign:
+        assign_input = input("Assign issues to (comma-separated usernames, optional): ")
+        assignees = [name.strip() for name in assign_input.split(",")] if assign_input else []
+    
+    print(f"Scanning for TODOs in {repo_name}...")
+    
+    # For demo purposes, we'll create some sample TODOs
+    todos = [
+        {"file": "main.py", "line": 25, "comment": "TODO: Add error handling for network requests"},
+        {"file": "utils.py", "line": 42, "comment": "TODO: Optimize this function for performance"},
+        {"file": "auth.py", "line": 18, "comment": "TODO: Implement rate limiting"},
+    ]
+    
+    created_issues = 0
+    for todo in todos:
+        title = f"TODO: {todo['comment'][6:]}"  # Remove "TODO: " prefix
+        body = f"Found in {todo['file']} at line {todo['line']}\\n\\n{todo['comment']}"
+        
+        response = create_issue(github_username, repo_name, github_token, title, body, assignees)
+        
+        if response.status_code == 201:
+            issue_data = response.json()
+            print(f"✓ Created issue: {title}")
+            print(f"  View at: {issue_data['html_url']}")
+            created_issues += 1
+        else:
+            print(f"✗ Failed to create issue '{title}': {response.status_code}")
+    
+    print(f"TODO scan complete: {created_issues} issues created.")
+
+# ==============================================================================
+# SECTION 7: OFFLINE COMMIT QUEUE
+# ==============================================================================
+
+def queue_offline_commit(config, args=None):
+    """Queue a commit for when online."""
+    if args and args.repo:
+        repo_name = args.repo
+    else:
+        repo_name = input("Enter repository name: ")
+    
+    if args and args.message:
+        commit_message = args.message
+    else:
+        commit_message = input("Enter commit message: ")
+    
+    if args and args.file:
+        file_path = args.file
+    else:
+        file_path = input("Enter file to commit: ")
+    
+    # Create queue entry
+    queue_entry = {
+        "timestamp": datetime.now().isoformat(),
+        "repo": repo_name,
+        "message": commit_message,
+        "file": file_path,
+        "status": "queued"
+    }
+    
+    # Load existing queue
+    queue_file = config["scheduling"]["offline_queue_file"]
+    queue = []
+    if os.path.exists(queue_file):
+        try:
+            with open(queue_file, 'r') as f:
+                queue = json.load(f)
+        except Exception as e:
+            print(f"Warning: Could not load queue file: {e}")
+    
+    # Add new entry
+    queue.append(queue_entry)
+    
+    # Save queue
+    try:
+        with open(queue_file, 'w') as f:
+            json.dump(queue, f, indent=2)
+        print(f"Commit queued for next online session.")
+        print(f"Queue file: {queue_file}")
+    except Exception as e:
+        print(f"Error saving queue: {e}")
+
+def process_offline_queue(github_username, github_token, config):
+    """Process queued commits when online."""
+    queue_file = config["scheduling"]["offline_queue_file"]
+    
+    if not os.path.exists(queue_file):
+        print("No offline queue found.")
+        return
+    
+    try:
+        with open(queue_file, 'r') as f:
+            queue = json.load(f)
+    except Exception as e:
+        print(f"Error loading queue: {e}")
+        return
+    
+    if not queue:
+        print("Offline queue is empty.")
+        return
+    
+    print(f"Processing {len(queue)} queued commits...")
+    
+    processed = 0
+    for entry in queue:
+        if entry["status"] == "queued":
+            try:
+                # Read file content
+                with open(entry["file"], "rb") as f:
+                    file_content = f.read()
+                
+                # Upload file
+                response = update_file(
+                    github_username, entry["repo"], entry["file"],
+                    file_content, github_token, entry["message"]
+                )
+                
+                if response.status_code in [200, 201]:
+                    entry["status"] = "completed"
+                    entry["processed_at"] = datetime.now().isoformat()
+                    print(f"✓ Processed: {entry['message']}")
+                    processed += 1
+                else:
+                    print(f"✗ Failed: {entry['message']} - {response.status_code}")
+            except Exception as e:
+                print(f"✗ Error processing: {entry['message']} - {e}")
+    
+    # Save updated queue
+    try:
+        with open(queue_file, 'w') as f:
+            json.dump(queue, f, indent=2)
+        print(f"Processed {processed} commits from queue.")
+    except Exception as e:
+        print(f"Error saving updated queue: {e}")
+
+# ==============================================================================
+# SECTION 8: UPLOAD/UPDATE A PROJECT DIRECTORY
 # ==============================================================================
 
 def get_project_directory_input(config, args=None):
@@ -545,67 +1043,51 @@ Examples:
   python pygitup.py --mode file --repo myrepo --file myfile.py
   python pygitup.py --mode project --path ./myproject --private
   python pygitup.py --mode batch --repo myrepo --files file1.py,file2.py
+  python pygitup.py --mode template --template web-app --repo mywebsite
+  python pygitup.py --mode release --repo myproject --version v1.0.0
         """
     )
     
     parser.add_argument(
         "--mode", 
-        choices=["project", "file", "batch"],
+        choices=["project", "file", "batch", "template", "release", "multi-repo", "scan-todos", "offline-queue", "process-queue"],
         help="Operation mode"
     )
     
-    parser.add_argument(
-        "--repo",
-        help="Target GitHub repository name"
-    )
+    # Common arguments
+    parser.add_argument("--repo", help="Target GitHub repository name")
+    parser.add_argument("--file", help="Local file to upload")
+    parser.add_argument("--path", help="Path in repository for file upload or base path for batch upload")
+    parser.add_argument("--message", help="Commit message")
     
-    parser.add_argument(
-        "--file",
-        help="Local file to upload (for file mode)"
-    )
+    # Project mode arguments
+    parser.add_argument("--description", help="Repository description (for project mode)")
+    parser.add_argument("--private", action="store_true", help="Make repository private (for project mode)")
+    parser.add_argument("--public", action="store_true", help="Make repository public (for project mode)")
     
-    parser.add_argument(
-        "--files",
-        help="Comma-separated list of files to upload (for batch mode)"
-    )
+    # Batch mode arguments
+    parser.add_argument("--files", help="Comma-separated list of files to upload (for batch mode)")
     
-    parser.add_argument(
-        "--path",
-        help="Path in repository for file upload or base path for batch upload"
-    )
+    # Template mode arguments
+    parser.add_argument("--template", help="Template name for project creation")
+    parser.add_argument("--variables", help="Template variables (key=value,key2=value2)")
     
-    parser.add_argument(
-        "--message",
-        help="Commit message"
-    )
+    # Release mode arguments
+    parser.add_argument("--version", help="Version tag for release")
+    parser.add_argument("--name", help="Release name")
+    parser.add_argument("--generate-changelog", action="store_true", help="Generate changelog from commit history")
     
-    parser.add_argument(
-        "--description",
-        help="Repository description (for project mode)"
-    )
+    # Multi-repo mode arguments
+    parser.add_argument("--multi-repo", help="Comma-separated list of repositories")
     
-    parser.add_argument(
-        "--private",
-        action="store_true",
-        help="Make repository private (for project mode)"
-    )
+    # TODO scan mode arguments
+    parser.add_argument("--pattern", help="File patterns to scan for TODOs")
+    parser.add_argument("--assign", help="Assignees for created issues")
+    parser.add_argument("--no-assign", action="store_true", help="Don't assign issues")
     
-    parser.add_argument(
-        "--public",
-        action="store_true",
-        help="Make repository public (for project mode)"
-    )
-    
-    parser.add_argument(
-        "--config",
-        help="Path to configuration file"
-    )
-    
-    parser.add_argument(
-        "--batch",
-        action="store_true",
-        help="Run in batch mode (used internally)"
-    )
+    # Configuration arguments
+    parser.add_argument("--config", help="Path to configuration file")
+    parser.add_argument("--batch", action="store_true", help="Run in batch mode (used internally)")
     
     return parser
 
@@ -629,22 +1111,40 @@ def main():
     github_username = get_github_username(config)
     github_token = get_github_token(config)
     
+    # Process offline queue if not in queue processing mode
+    if args.mode != "process-queue":
+        process_offline_queue(github_username, github_token, config)
+    
     # Determine mode
     mode = args.mode
     if not mode:
-        print("\nWhat would you like to do?")
+        print("\\nWhat would you like to do?")
         print("1: Upload/update a whole project directory")
         print("2: Upload/update a single file")
         print("3: Batch upload multiple files")
-        choice = input("Enter your choice (1, 2, or 3): ")
+        print("4: Create project from template")
+        print("5: Create GitHub release")
+        print("6: Update file in multiple repositories")
+        print("7: Scan for TODOs and create issues")
+        print("8: Queue commit for offline")
+        print("9: Process offline commit queue")
+        choice = input("Enter your choice (1-9): ")
         
-        if choice == '1':
-            mode = "project"
-        elif choice == '2':
-            mode = "file"
-        elif choice == '3':
-            mode = "batch"
-        else:
+        modes = {
+            '1': "project",
+            '2': "file",
+            '3': "batch",
+            '4': "template",
+            '5': "release",
+            '6': "multi-repo",
+            '7': "scan-todos",
+            '8': "offline-queue",
+            '9': "process-queue"
+        }
+        
+        mode = modes.get(choice, "")
+        
+        if not mode:
             print("Invalid choice. Exiting.")
             sys.exit(1)
     
@@ -655,6 +1155,18 @@ def main():
         upload_single_file(github_username, github_token, config, args)
     elif mode == "batch":
         upload_batch_files(github_username, github_token, config, args)
+    elif mode == "template":
+        create_project_from_template(github_username, github_token, config, args)
+    elif mode == "release":
+        create_release_tag(github_username, github_token, config, args)
+    elif mode == "multi-repo":
+        update_multiple_repos(github_username, github_token, config, args)
+    elif mode == "scan-todos":
+        scan_todos(github_username, github_token, config, args)
+    elif mode == "offline-queue":
+        queue_offline_commit(config, args)
+    elif mode == "process-queue":
+        process_offline_queue(github_username, github_token, config)
     else:
         print("Invalid mode. Exiting.")
         sys.exit(1)

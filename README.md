@@ -12,10 +12,15 @@ This tool streamlines your entire GitHub workflow, whether you're pushing a bran
 
 ## ✨ Key Features
 
--   ✅ **Triple-Mode Operation:**
+-   ✅ **Multiple Operation Modes:**
     -   **Project Mode:** Upload an entire project directory. `PyGitUp` initializes a git repo, creates the remote on GitHub, and pushes your code in one go.
     -   **File Mode:** Upload or overwrite a single file directly using the GitHub API. Perfect for quick updates.
     -   **Batch Mode:** Upload multiple files at once with a single command.
+    -   **Template Mode:** Create new projects from templates with variable substitution.
+    -   **Release Mode:** Create GitHub releases with auto-generated changelogs.
+    -   **Multi-Repo Mode:** Update the same file across multiple repositories.
+    -   **TODO Scan Mode:** Automatically create GitHub issues from TODO comments in your code.
+    -   **Offline Queue Mode:** Queue commits when offline and automatically push when online.
 -   ✅ **Flexible Configuration:**
     -   Command-line arguments for automated usage
     -   Configuration file support (`pygitup.yaml`) for default settings
@@ -25,10 +30,13 @@ This tool streamlines your entire GitHub workflow, whether you're pushing a bran
     -   A file selector that lists files in your current directory for easy selection.
     -   Progress bars for long operations
     -   Detailed logging capabilities
--   ✅ **User-Friendly:**
-    -   Securely prompts for your GitHub Personal Access Token.
-    -   Handles existing repositories and non-empty remotes gracefully with a force-push option.
-    -   Clear, step-by-step prompts guide you through the process.
+-   ✅ **Unique Value Propositions:**
+    -   **Direct File Updates Without Cloning:** Update remote files without downloading the entire repository.
+    -   **Template-Based Project Creation:** Start new projects from customizable templates.
+    -   **Automated Release Management:** Create releases with auto-generated changelogs.
+    -   **Multi-Repository Operations:** Update files across multiple repositories simultaneously.
+    -   **Automated Issue Creation:** Convert TODO comments to GitHub issues.
+    -   **Offline Commit Queue:** Work offline and sync when you're back online.
 
 ## 🎬 Demonstration
 
@@ -43,7 +51,13 @@ What would you like to do?
 1: Upload/update a whole project directory
 2: Upload/update a single file
 3: Batch upload multiple files
-Enter your choice (1, 2, or 3): 2
+4: Create project from template
+5: Create GitHub release
+6: Update file in multiple repositories
+7: Scan for TODOs and create issues
+8: Queue commit for offline
+9: Process offline commit queue
+Enter your choice (1-9): 2
 
 Enter the name of the target GitHub repository: My-Awesome-Project
 
@@ -85,6 +99,8 @@ python pygitup.py
 
 ### Command-Line Mode
 For automated usage, use command-line arguments:
+
+#### Basic Operations
 ```bash
 # Upload a single file
 python pygitup.py --mode file --repo My-Awesome-Project --file main.py --path src/main.py --message "Update main module"
@@ -94,6 +110,27 @@ python pygitup.py --mode project --path ./myproject --repo My-Awesome-Project --
 
 # Batch upload multiple files
 python pygitup.py --mode batch --repo My-Awesome-Project --files "file1.py,file2.py,file3.py" --path src/
+```
+
+#### Advanced Features
+```bash
+# Create project from template
+python pygitup.py --mode template --template web-app --repo MyWebsite --variables "PROJECT_NAME=MyWebsite,DESCRIPTION=My awesome website"
+
+# Create GitHub release with changelog
+python pygitup.py --mode release --repo MyProject --version v1.2.0 --name "Version 1.2.0" --generate-changelog
+
+# Update file in multiple repositories
+python pygitup.py --mode multi-repo --multi-repo "repo1,repo2,repo3" --file config.json --path configs/config.json --message "Update configuration"
+
+# Scan for TODOs and create issues
+python pygitup.py --mode scan-todos --repo MyProject --pattern "*.py,*.js" --assign "maintainer"
+
+# Queue commit for offline work
+python pygitup.py --mode offline-queue --repo MyProject --file important.py --message "Important update"
+
+# Process offline queue when back online
+python pygitup.py --mode process-queue
 ```
 
 ### Configuration File
@@ -116,6 +153,12 @@ logging:
   enabled: true
   file: "pygitup.log"
   level: "INFO"
+
+templates:
+  directory: "./templates"
+
+scheduling:
+  offline_queue_file: ".pygitup_offline_queue"
 ```
 
 ### Environment Variables
