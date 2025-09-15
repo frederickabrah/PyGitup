@@ -21,6 +21,8 @@ This tool streamlines your entire GitHub workflow, whether you're pushing a bran
     -   **Multi-Repo Mode:** Update the same file across multiple repositories.
     -   **TODO Scan Mode:** Automatically create GitHub issues from TODO comments in your code.
     -   **Offline Queue Mode:** Queue commits when offline and automatically push when online.
+    -   **Code Review Mode:** Request code reviews for specific files.
+    -   **Smart Push Mode:** Squash meaningless commits before pushing.
 -   ✅ **Flexible Configuration:**
     -   Command-line arguments for automated usage
     -   Configuration file support (`pygitup.yaml`) for default settings
@@ -37,6 +39,8 @@ This tool streamlines your entire GitHub workflow, whether you're pushing a bran
     -   **Multi-Repository Operations:** Update files across multiple repositories simultaneously.
     -   **Automated Issue Creation:** Convert TODO comments to GitHub issues.
     -   **Offline Commit Queue:** Work offline and sync when you're back online.
+    -   **Code Review Automation:** Request code reviews for specific files.
+    -   **Smart History Management:** Squash meaningless commits automatically.
 
 ## 🎬 Demonstration
 
@@ -57,7 +61,9 @@ What would you like to do?
 7: Scan for TODOs and create issues
 8: Queue commit for offline
 9: Process offline commit queue
-Enter your choice (1-9): 2
+10: Request code review
+11: Smart push with commit squashing
+Enter your choice (1-11): 2
 
 Enter the name of the target GitHub repository: My-Awesome-Project
 
@@ -131,6 +137,12 @@ python pygitup.py --mode offline-queue --repo MyProject --file important.py --me
 
 # Process offline queue when back online
 python pygitup.py --mode process-queue
+
+# Request code review
+python pygitup.py --mode request-review --repo MyProject --files "src/auth.py,src/utils.py" --reviewers "alice,bob"
+
+# Smart push with commit squashing
+python pygitup.py --mode smart-push --repo MyProject --squash-pattern "typo,fix,update"
 ```
 
 ### Configuration File
