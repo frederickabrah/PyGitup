@@ -23,6 +23,8 @@ This tool streamlines your entire GitHub workflow, whether you're pushing a bran
     -   **Offline Queue Mode:** Queue commits when offline and automatically push when online.
     -   **Code Review Mode:** Request code reviews for specific files.
     -   **Smart Push Mode:** Squash meaningless commits before pushing.
+    -   **Documentation Mode:** Automatically generate documentation from code comments.
+    -   **Analytics Mode:** Generate team contribution reports and statistics.
 -   ✅ **Flexible Configuration:**
     -   Command-line arguments for automated usage
     -   Configuration file support (`pygitup.yaml`) for default settings
@@ -41,6 +43,8 @@ This tool streamlines your entire GitHub workflow, whether you're pushing a bran
     -   **Offline Commit Queue:** Work offline and sync when you're back online.
     -   **Code Review Automation:** Request code reviews for specific files.
     -   **Smart History Management:** Squash meaningless commits automatically.
+    -   **Automated Documentation Generation:** Create documentation from code comments.
+    -   **Collaboration Analytics:** Generate team contribution reports.
 
 ## 🎬 Demonstration
 
@@ -63,7 +67,9 @@ What would you like to do?
 9: Process offline commit queue
 10: Request code review
 11: Smart push with commit squashing
-Enter your choice (1-11): 2
+12: Generate documentation
+13: Generate collaboration analytics
+Enter your choice (1-13): 2
 
 Enter the name of the target GitHub repository: My-Awesome-Project
 
@@ -143,6 +149,12 @@ python pygitup.py --mode request-review --repo MyProject --files "src/auth.py,sr
 
 # Smart push with commit squashing
 python pygitup.py --mode smart-push --repo MyProject --squash-pattern "typo,fix,update"
+
+# Generate documentation
+python pygitup.py --mode generate-docs --repo MyProject --output docs/
+
+# Generate collaboration analytics
+python pygitup.py --mode analytics --repo MyProject --period "last-month"
 ```
 
 ### Configuration File
@@ -171,6 +183,9 @@ templates:
 
 scheduling:
   offline_queue_file: ".pygitup_offline_queue"
+
+analytics:
+  period: "last-month"
 ```
 
 ### Environment Variables
