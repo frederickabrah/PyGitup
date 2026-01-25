@@ -1,0 +1,3 @@
+# Run this command to upload PyGitUp to your GitHub:
+
+python pygitup.py --mode project --path . --repo PyGitUp --description "A powerful CLI tool to automate GitHub workflows." --public
