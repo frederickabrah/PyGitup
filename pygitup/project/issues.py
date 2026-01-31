@@ -3,7 +3,7 @@ import re
 import os
 import subprocess
 import hashlib
-from ..github.api import create_issue, get_issues
+from ..github.api import create_issue, get_issues, search_user_by_email
 from ..utils.ui import print_success, print_error, print_info, print_warning
 
 def get_git_author(file_path, line_num):
@@ -107,11 +107,19 @@ def scan_todos(github_username, github_token, config, args=None):
             created_count += 1
             continue
 
-        # In a real scenario, we might use the author's email to find their GH username,
-        # but for now, we'll stick to provided assignees or none.
-        assignees = [name.strip() for name in args.assign.split(",")] if args and args.assign else []
-        
-        response = create_issue(github_username, repo_name, github_token, title, body, assignees)
+        # Real-Time Identity Resolution: Map email to actual GitHub username
+        resolved_assignees = [name.strip() for name in args.assign.split(",")] if args and args.assign else []
+        if todo['author']:
+            user_resp = search_user_by_email(todo['author'], github_token)
+            if user_resp.status_code == 200:
+                items = user_resp.json().get('items', [])
+                if items:
+                    gh_username = items[0]['login']
+                    if gh_username not in resolved_assignees:
+                        resolved_assignees.append(gh_username)
+                        print_info(f"Resolved author email {todo['author']} to @{gh_username}")
+
+        response = create_issue(github_username, repo_name, github_token, title, body, resolved_assignees)
         if response.status_code == 201:
             print_success(f"Created issue: {title}")
             created_count += 1
