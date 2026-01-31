@@ -1,5 +1,5 @@
 
-from rich.console import Console
+from rich.console import Console, Group
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -69,7 +69,7 @@ def display_menu(options):
     console.print(table)
 
 def display_repo_info(data):
-    """Displays repository info in a rich panel."""
+    """Displays repository info in a rich panel with traffic analytics."""
     grid = Table.grid(expand=True)
     grid.add_column(justify="left", style="cyan", no_wrap=True)
     grid.add_column(justify="left", style="white")
@@ -89,6 +89,41 @@ def display_repo_info(data):
     for label, value in fields.items():
         grid.add_row(f"{label}:", str(value))
 
+    # Traffic analytics section if available
+    if 'traffic' in data and data['traffic']:
+        traffic = data['traffic']
+        grid.add_row("", "") # Spacer
+        grid.add_row("[bold]Traffic Analytics (Admin Only)[/bold]", "")
+
+        if 'clones' in traffic and traffic['clones'].get('clones'):
+            # Safely get the last element or use defaults
+            clones_list = traffic['clones']['clones']
+            if clones_list:
+                latest_clones = clones_list[-1]
+                grid.add_row("Clones (Last recorded):", f"{latest_clones['count']} ({latest_clones['uniques']} unique)")
+
+        if 'views' in traffic and traffic['views'].get('views'):
+            views_list = traffic['views']['views']
+            if views_list:
+                latest_views = views_list[-1]
+                grid.add_row("Views (Last recorded):", f"{latest_views['count']} ({latest_views['uniques']} unique)")
+
+        if 'referrers' in traffic and traffic['referrers']:
+            referrer_table = Table(title="Top Referrers", box=box.SIMPLE)
+            referrer_table.add_column("Referrer", style="cyan")
+            referrer_table.add_column("Visits", style="green")
+            referrer_table.add_column("Unique", style="yellow")
+
+            for referrer in traffic['referrers'][:5]:
+                referrer_table.add_row(
+                    referrer['referrer'],
+                    str(referrer['count']),
+                    str(referrer['uniques'])
+                )
+            
+            grid.add_row("", "")
+            grid.add_row("Traffic Sources:", referrer_table)
+
     panel = Panel(
         grid,
         title=f"[bold]{data.get('full_name')}[/bold]",
@@ -96,3 +131,41 @@ def display_repo_info(data):
         subtitle=data.get("description") or "No description"
     )
     console.print(panel)
+
+def display_traffic_trends(traffic_data):
+    """Display traffic trends in a tabular format."""
+    if not traffic_data:
+        return
+
+    groups = []
+
+    if 'clones' in traffic_data and traffic_data['clones'].get('clones'):
+        clones_table = Table(title="Clone Trends (Last 14 Days)", box=box.MINIMAL)
+        clones_table.add_column("Date", style="cyan")
+        clones_table.add_column("Clones", style="green")
+        clones_table.add_column("Unique", style="yellow")
+
+        for clone_data in traffic_data['clones']['clones']:
+            clones_table.add_row(
+                clone_data['timestamp'][:10],
+                str(clone_data['count']),
+                str(clone_data['uniques'])
+            )
+        groups.append(clones_table)
+
+    if 'views' in traffic_data and traffic_data['views'].get('views'):
+        views_table = Table(title="View Trends (Last 14 Days)", box=box.MINIMAL)
+        views_table.add_column("Date", style="cyan")
+        views_table.add_column("Views", style="green")
+        views_table.add_column("Unique", style="yellow")
+
+        for view_data in traffic_data['views']['views']:
+            views_table.add_row(
+                view_data['timestamp'][:10],
+                str(view_data['count']),
+                str(view_data['uniques'])
+            )
+        groups.append(views_table)
+
+    if groups:
+        console.print(Group(*groups))

@@ -4,3 +4,4 @@ tqdm
 pip-audit
 inquirer
 rich
+beautifulsoup4

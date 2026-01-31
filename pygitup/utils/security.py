@@ -1,6 +1,9 @@
 import subprocess
 import os
 import fnmatch
+import math
+from ..github.api import get_dependabot_alerts, get_secret_scanning_alerts
+from ..utils.ui import print_success, print_error, print_warning, print_info, print_header
 
 # List of patterns that are usually sensitive or too heavy to upload
 SENSITIVE_PATTERNS = [
@@ -18,135 +21,138 @@ SENSITIVE_PATTERNS = [
     ".git", ".idea", ".vscode"
 ]
 
-def run_audit():
+def calculate_entropy(data):
+    """Calculates the Shannon entropy of a string."""
+    if not data:
+        return 0
+    entropy = 0
+    for x in range(256):
+        p_x = float(data.count(chr(x))) / len(data)
+        if p_x > 0:
+            entropy += - p_x * math.log(p_x, 2)
+    return entropy
+
+def run_audit(github_username=None, repo_name=None, github_token=None):
     """Run a security audit on the project dependencies."""
-    print("Running security audit on project dependencies...")
+    print_header("Security Audit")
+    
+    # Local pip-audit
+    print_info("Running local pip-audit on current environment...")
     try:
         result = subprocess.run(["pip-audit"], capture_output=True, text=True)
-        print(result.stdout)
-        if result.stderr:
-            print("Audit Warnings/Errors:")
-            print(result.stderr)
-        
         if result.returncode == 0:
-            print("\nAudit complete: No known vulnerabilities found.")
-        elif result.returncode == 1:
-            print("\nAudit complete: Vulnerabilities were found (listed above).")
+            print_success("No known local vulnerabilities found via pip-audit.")
         else:
-            print(f"\nAn unexpected error occurred during the audit. Exit code: {result.returncode}")
-
+            print_warning("Local vulnerabilities detected:")
+            print(result.stdout)
     except FileNotFoundError:
-        print("Error: 'pip-audit' is not installed. Please install it by running 'pip install pip-audit'")
+        print_warning("'pip-audit' not found. Skipping local scan.")
+
+    # Remote GitHub Security scan if context provided
+    if github_username and repo_name and github_token:
+        run_advanced_security_scan(github_username, repo_name, github_token)
+
+def run_advanced_security_scan(username, repo_name, token):
+    """Deep vulnerability scanning using GitHub's security APIs."""
+    print_info(f"Fetching GitHub Security Alerts for {repo_name}...")
+    
+    try:
+        # Dependabot
+        dep_resp = get_dependabot_alerts(username, repo_name, token)
+        if dep_resp.status_code == 200:
+            alerts = dep_resp.json()
+            open_alerts = [a for a in alerts if a['state'] == 'open']
+            if open_alerts:
+                print_error(f"Found {len(open_alerts)} OPEN Dependabot vulnerabilities!")
+                for a in open_alerts[:3]:
+                    print(f" - {a['security_advisory']['summary']} ({a['security_advisory']['severity']})")
+            else:
+                print_success("No open Dependabot alerts found.")
+        
+        # Secret Scanning
+        sec_resp = get_secret_scanning_alerts(username, repo_name, token)
+        if sec_resp.status_code == 200:
+            secrets = sec_resp.json()
+            open_secrets = [s for s in secrets if s['state'] == 'open']
+            if open_secrets:
+                print_error(f"ALERT: {len(open_secrets)} LEAKED SECRETS detected in repo history!")
+                for s in open_secrets:
+                    print(f" - Type: {s['secret_type']} at {s['html_url']}")
+            else:
+                print_success("No leaked secrets detected.")
+        elif sec_resp.status_code == 404:
+            print_info("Secret scanning is not enabled or not supported for this repo.")
+
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        print_warning(f"Advanced security scan failed: {e}")
 
 def check_is_sensitive(file_path):
-    """Checks if a file path matches any sensitive patterns."""
+    """Checks if a file path matches any sensitive patterns or has high entropy contents."""
     name = os.path.basename(file_path)
-    for pattern in SENSITIVE_PATTERNS:
-        if fnmatch.fnmatch(name, pattern):
+    
+    # 1. Filename Pattern Check
+    gitignore_patterns = []
+    if os.path.exists(".gitignore"):
+        with open(".gitignore", "r") as f:
+            gitignore_patterns = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+
+    all_patterns = SENSITIVE_PATTERNS + gitignore_patterns
+    for pattern in all_patterns:
+        if fnmatch.fnmatch(name, pattern) or fnmatch.fnmatch(file_path, pattern):
             return True
-        # Check for directory matches (e.g. node_modules/)
-        if pattern in file_path.split(os.sep):
-            return True
+
+    # 2. Sophisticated Content Analysis (High Entropy Detection)
+    if os.path.isfile(file_path) and os.path.getsize(file_path) < 1024 * 500:
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+                for line in content.splitlines():
+                    words = line.split()
+                    for word in words:
+                        if len(word) > 20 and calculate_entropy(word) > 4.5:
+                            return True
+        except Exception:
+            pass
+
     return False
 
 def audit_files_and_prompt(files):
-    """
-    Scans a list of files for sensitive content.
-    Returns: The list of files to proceed with (filtered or original).
-    """
+    """Scans a list of files for sensitive content."""
     sensitive_matches = [f for f in files if check_is_sensitive(f)]
-    
     if not sensitive_matches:
         return files
 
-    print("\n" + "!" * 50)
-    print("SECURITY WARNING: Sensitive or heavy files detected!")
-    print("!" * 50)
-    print("The following files look like they shouldn't be uploaded:")
-    for f in sensitive_matches[:10]:
+    print_warning(f"SECURITY WARNING: {len(sensitive_matches)} sensitive or heavy files detected!")
+    for f in sensitive_matches[:5]:
         print(f" - {f}")
-    if len(sensitive_matches) > 10:
-        print(f" ... and {len(sensitive_matches) - 10} more.")
     
-    while True:
-        print("\nHow do you want to proceed?")
-        print("1. Skip these files (Recommended)")
-        print("2. Upload them anyway (I know what I'm doing)")
-        print("3. Cancel operation")
-        
-        choice = input("Enter choice (1-3): ").strip()
-        
-        if choice == "1":
-            safe_files = [f for f in files if f not in sensitive_matches]
-            print(f"Skipped {len(sensitive_matches)} sensitive files.")
-            return safe_files
-        elif choice == "2":
-            print("Proceeding with all files.")
-            return files
-        elif choice == "3":
-            print("Operation cancelled by user.")
-            return []
-        else:
-            print("Invalid choice. Please try again.")
+    choice = input("\nHow to proceed? (1: Skip them [Default], 2: Upload anyway, 3: Cancel): ") or "1"
+    
+    if choice == "1":
+        return [f for f in files if f not in sensitive_matches]
+    elif choice == "2":
+        return files
+    return []
 
 def scan_directory_for_sensitive_files(directory):
-    """
-    Scans a directory for sensitive files before git add.
-    Returns: True if safe to proceed, False if cancelled.
-    If 'Skip' is selected, it appends to .gitignore.
-    """
+    """Scans a directory for sensitive files before git add."""
     detected = []
     for root, dirs, files in os.walk(directory):
-        # Check dirs to prune checking inside node_modules etc
-        sensitive_dirs = [d for d in dirs if check_is_sensitive(d)]
-        for d in sensitive_dirs:
-            detected.append(os.path.join(root, d) + "/")
-        
-        # Check files
-        for f in files:
-            full_path = os.path.join(root, f)
+        for name in dirs + files:
+            full_path = os.path.join(root, name)
             if check_is_sensitive(full_path):
                 detected.append(full_path)
 
     if not detected:
         return True
 
-    print("\n" + "!" * 50)
-    print("SECURITY WARNING: Sensitive files detected in this directory!")
-    print("!" * 50)
-    print("Found potential issues:")
-    for f in detected[:10]:
-        print(f" - {f}")
-    if len(detected) > 10:
-        print(f" ... and {len(detected) - 10} more.")
-
-    while True:
-        print("\nHow do you want to proceed?")
-        print("1. Add them to .gitignore (Recommended)")
-        print("2. Upload them anyway (Risky)")
-        print("3. Cancel operation")
-        
-        choice = input("Enter choice (1-3): ").strip()
-        
-        if choice == "1":
-            gitignore_path = os.path.join(directory, ".gitignore")
-            try:
-                with open(gitignore_path, "a") as f:
-                    f.write("\n# Added by PyGitUp Security Check\n")
-                    for item in detected:
-                        # Convert to relative path for gitignore
-                        rel_path = os.path.relpath(item, directory)
-                        f.write(f"{rel_path}\n")
-                print("Updated .gitignore with sensitive files.")
-                return True
-            except Exception as e:
-                print(f"Error writing to .gitignore: {e}")
-                return False
-        elif choice == "2":
-            return True
-        elif choice == "3":
-            return False
-        else:
-            print("Invalid choice.")
+    print_warning(f"Sensitive files found: {len(detected)}")
+    choice = input("\nAction? (1: Add to .gitignore, 2: Ignore warning, 3: Cancel): ")
+    
+    if choice == "1":
+        with open(".gitignore", "a") as f:
+            f.write("\n# Added by PyGitUp Interceptor\n")
+            for item in detected:
+                f.write(f"{os.path.relpath(item, directory)}\n")
+        return True
+    return choice == "2"
