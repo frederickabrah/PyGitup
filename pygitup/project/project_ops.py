@@ -6,6 +6,7 @@ from tqdm import tqdm
 
 from ..github.api import update_file, get_file_info, create_repo, get_repo_info
 from ..utils.security import scan_directory_for_sensitive_files, audit_files_and_prompt, check_is_sensitive
+from ..utils.validation import validate_repo_name, validate_file_path, sanitize_input
 
 TQDM_AVAILABLE = True # Assume available for now
 
@@ -115,6 +116,17 @@ def upload_project_directory(github_username, github_token, config, args=None):
 
     project_path, repo_name, repo_description, is_private = get_project_directory_input(config, args)
     
+    # Input Validation
+    is_valid_path, path_err = validate_file_path(project_path)
+    if not is_valid_path:
+        print(f"Error: {path_err}")
+        return
+
+    is_valid_repo, repo_err = validate_repo_name(repo_name)
+    if not is_valid_repo:
+        print(f"Error: {repo_err}")
+        return
+
     # Run security scan on the directory
     if not scan_directory_for_sensitive_files(project_path):
         print("Upload cancelled due to security check.")
@@ -195,6 +207,17 @@ def upload_single_file(github_username, github_token, config, args=None):
         return
 
     repo_name, local_file_path, repo_file_path, commit_message = get_single_file_input(config, args)
+
+    # Input Validation
+    is_valid_path, path_err = validate_file_path(local_file_path)
+    if not is_valid_path:
+        print(f"Error: {path_err}")
+        return False
+
+    is_valid_repo, repo_err = validate_repo_name(repo_name)
+    if not is_valid_repo:
+        print(f"Error: {repo_err}")
+        return False
 
     if check_is_sensitive(local_file_path):
         print(f"\nWARNING: '{local_file_path}' appears to be a sensitive file.")

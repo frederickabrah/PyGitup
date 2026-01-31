@@ -108,19 +108,20 @@ class TestPygitup(unittest.TestCase):
         # Unset the environment variable
         del os.environ["GITHUB_USERNAME"]
 
-    @patch('pygitup.github.api.requests.get')
-    def test_get_repo_info(self, mock_get):
+    @patch('pygitup.github.api.requests.request')
+    def test_get_repo_info(self, mock_request):
         # Set up the mock response
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"name": "test-repo", "description": "A test repo"}
-        mock_get.return_value = mock_response
+        mock_request.return_value = mock_response
 
         # Call the function
         response = get_repo_info("testuser", "test-repo", "test_token")
 
-        # Assert that requests.get was called correctly
-        mock_get.assert_called_once_with(
+        # Assert that requests.request was called correctly
+        mock_request.assert_called_once_with(
+            "GET",
             "https://api.github.com/repos/testuser/test-repo",
             headers={"Authorization": "token test_token", "Accept": "application/vnd.github.v3+json"}
         )
@@ -128,19 +129,20 @@ class TestPygitup(unittest.TestCase):
         # Assert that the function returns the mock response
         self.assertEqual(response, mock_response)
 
-    @patch('pygitup.github.api.requests.post')
-    def test_create_repo(self, mock_post):
+    @patch('pygitup.github.api.requests.request')
+    def test_create_repo(self, mock_request):
         # Set up the mock response
         mock_response = Mock()
         mock_response.status_code = 201
         mock_response.json.return_value = {"name": "test-repo", "html_url": "https://github.com/testuser/test-repo"}
-        mock_post.return_value = mock_response
+        mock_request.return_value = mock_response
 
         # Call the function
         response = create_repo("testuser", "test-repo", "test_token", description="A test repo", private=True)
 
-        # Assert that requests.post was called correctly
-        mock_post.assert_called_once_with(
+        # Assert that requests.request was called correctly
+        mock_request.assert_called_once_with(
+            "POST",
             "https://api.github.com/user/repos",
             headers={"Authorization": "token test_token", "Accept": "application/vnd.github.v3+json"},
             json={"name": "test-repo", "description": "A test repo", "private": True}
@@ -149,21 +151,22 @@ class TestPygitup(unittest.TestCase):
         # Assert that the function returns the mock response
         self.assertEqual(response, mock_response)
 
-    @patch('pygitup.github.api.requests.put')
-    def test_update_file(self, mock_put):
+    @patch('pygitup.github.api.requests.request')
+    def test_update_file(self, mock_request):
         # Set up the mock response
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"commit": {"sha": "12345"}}
-        mock_put.return_value = mock_response
+        mock_request.return_value = mock_response
 
         # Call the function
         content = b"Hello, World!"
         response = update_file("testuser", "test-repo", "hello.txt", content, "test_token", "Update hello.txt", sha="abcde")
 
-        # Assert that requests.put was called correctly
+        # Assert that requests.request was called correctly
         encoded_content = base64.b64encode(content).decode('utf-8')
-        mock_put.assert_called_once_with(
+        mock_request.assert_called_once_with(
+            "PUT",
             "https://api.github.com/repos/testuser/test-repo/contents/hello.txt",
             headers={"Authorization": "token test_token", "Accept": "application/vnd.github.v3+json"},
             json={"message": "Update hello.txt", "content": encoded_content, "sha": "abcde"}
