@@ -4,9 +4,10 @@ import sys
 import base64
 from tqdm import tqdm
 
-from ..github.api import update_file, get_file_info, create_repo, get_repo_info
+from ..github.api import update_file, get_file_info, create_repo, get_repo_info, get_user_repos
 from ..utils.security import scan_directory_for_sensitive_files, audit_files_and_prompt, check_is_sensitive
 from ..utils.validation import validate_repo_name, validate_file_path, sanitize_input
+from ..utils.ui import print_header, print_info, print_success, print_error
 
 TQDM_AVAILABLE = True # Assume available for now
 
@@ -452,3 +453,41 @@ def update_multiple_repos(github_username, github_token, config, args=None):
             print(f"✗ Error updating {repo_name}: {e}")
     
     print(f"Multi-repository update complete: {success_count}/{len(repo_names)} successful.")
+
+def manage_bulk_repositories(github_token):
+    """List all repositories and show aggregated health scores."""
+    print_header("Bulk Repository Management")
+    print_info("Fetching all your repositories...")
+    
+    try:
+        response = get_user_repos(github_token)
+        if response.status_code != 200:
+            print_error(f"Failed to fetch repos: {response.status_code}")
+            return
+            
+        repos = response.json()
+        print_success(f"Found {len(repos)} repositories.\n")
+        
+        print(f"{'Repository Name':<40} | {'Stars':<6} | {'Issues':<6} | {'Score':<6}")
+        print("-" * 65)
+        
+        import math
+        for r in repos:
+            stars = r.get('stargazers_count', 0)
+            issues = r.get('open_issues_count', 0)
+            
+            # Sophisticated Health Logic:
+            # 1. Star Weight: Logarithmic growth (tanh caps it)
+            # 2. Issue Penalty: Non-linear decay based on star-to-issue ratio
+            star_impact = math.tanh(stars / 50.0) * 70  # Max 70 points from stars
+            issue_ratio = issues / (stars + 1)
+            issue_penalty = math.tanh(issue_ratio) * 30 # Max 30 point penalty
+            
+            health_score = int(30 + star_impact - issue_penalty) # Baseline of 30
+            health_score = max(0, min(100, health_score))
+            
+            color = "green" if health_score > 75 else "yellow" if health_score > 45 else "red"
+            print(f"{r['name']:<40} | {stars:<6} | {issues:<6} | [{color}]{health_score}%[/{color}]")
+            
+    except Exception as e:
+        print_error(f"Bulk operation failed: {e}")

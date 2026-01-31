@@ -2,7 +2,7 @@ import sys
 
 from .core.args import create_parser
 from .core.config import load_config, get_github_username, get_github_token, configuration_wizard
-from .project.project_ops import upload_project_directory, upload_single_file, upload_batch_files, update_multiple_repos
+from .project.project_ops import upload_project_directory, upload_single_file, upload_batch_files, update_multiple_repos, manage_bulk_repositories
 from .project.templates import create_project_from_template
 from .github.releases import create_release_tag
 from .project.issues import scan_todos
@@ -69,14 +69,15 @@ def main():
             '20': ("Manage Webhooks", "webhook"),
             '21': ("Manage GitHub Actions", "actions"),
             '22': ("Manage Pull Requests", "pr"),
-            '23': ("Run security audit", "audit"),
+            '23': ("Run security audit (Local + GitHub)", "audit"),
             '24': ("Change repository visibility", "visibility"),
             '25': ("Get repository info from URL", "repo-info"),
-            '26': ("Delete GitHub repository", "delete-repo")
+            '26': ("Delete GitHub repository", "delete-repo"),
+            '27': ("Bulk Repository Management & Health", "bulk-mgmt")
         }
 
         display_menu(menu_options)
-        choice = input("\n👉 Enter your choice (1-26): ")
+        choice = input("\n👉 Enter your choice (1-27): ")
         
         selected_option = menu_options.get(choice)
         mode = selected_option[1] if selected_option else ""
@@ -127,13 +128,16 @@ def main():
     elif mode == "pr":
         manage_pull_requests(args, github_username, github_token)
     elif mode == "audit":
-        run_audit()
+        repo_to_audit = args.repo if args and hasattr(args, 'repo') and args.repo else input("Enter repo name for GitHub security scan: ")
+        run_audit(github_username, repo_to_audit, github_token)
     elif mode == "visibility":
         manage_repo_visibility(args, github_username, github_token)
     elif mode == "repo-info":
         get_detailed_repo_info(args, github_token)
     elif mode == "delete-repo":
         delete_repository(args, github_username, github_token)
+    elif mode == "bulk-mgmt":
+        manage_bulk_repositories(github_token)
     else:
         print_error("Invalid mode selected. Exiting.")
         sys.exit(1)

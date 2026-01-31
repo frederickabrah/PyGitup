@@ -1,69 +1,80 @@
-
-import requests
 import inquirer
-
-from .api import get_github_headers
+from .api import github_request, toggle_workflow_api
+from ..utils.ui import print_success, print_error, print_info, print_header
 
 def manage_actions(args, github_username, github_token):
-    """Handle GitHub Actions management operations."""
+    """Advanced GitHub Actions Control Center."""
     action = args.action if hasattr(args, 'action') and args.action else None
     repo_name = args.repo if hasattr(args, 'repo') and args.repo else None
-    workflow_id = args.workflow_id if hasattr(args, 'workflow_id') and args.workflow_id else None
-    ref = args.ref if hasattr(args, 'ref') and args.ref else 'main'
 
     if not action:
+        print_header("CI/CD Control Center")
         questions = [
             inquirer.List(
                 "action",
-                message="What Actions operation would you like to perform?",
-                choices=["trigger", "monitor"],
+                message="Select an Actions operation",
+                choices=["Trigger Workflow", "Monitor Status & Metrics", "Enable Workflow", "Disable Workflow"],
             )
         ]
         answers = inquirer.prompt(questions)
         action = answers["action"]
 
-        if not repo_name:
-            repo_questions = [inquirer.Text("repo", message="Enter the repository name")]
-            repo_answers = inquirer.prompt(repo_questions)
-            repo_name = repo_answers["repo"]
-
-        if action == "trigger":
-            trigger_questions = [
-                inquirer.Text("workflow_id", message="Enter the workflow ID (e.g., main.yml)"),
-                inquirer.Text("ref", message="Enter the ref to trigger the workflow on", default="main"),
-            ]
-            trigger_answers = inquirer.prompt(trigger_questions)
-            workflow_id = trigger_answers["workflow_id"]
-            ref = trigger_answers["ref"]
-
     if not repo_name:
-        print("Repository name is required for Actions operations.")
-        return
+        repo_name = inquirer.prompt([inquirer.Text("repo", message="Enter the repository name")])["repo"]
 
-    headers = get_github_headers(github_token)
     base_url = f"https://api.github.com/repos/{github_username}/{repo_name}/actions"
 
     try:
-        if action == "trigger":
-            url = f"{base_url}/workflows/{workflow_id}/dispatches"
-            data = {"ref": ref}
-            response = requests.post(url, headers=headers, json=data)
-            response.raise_for_status()
-            print("Workflow triggered successfully!")
+        if action == "Trigger Workflow":
+            # List workflows first to let user choose
+            w_resp = github_request("GET", f"{base_url}/workflows", github_token)
+            workflows = w_resp.json().get("workflows", [])
+            if not workflows:
+                print_error("No workflows found.")
+                return
+            
+            choices = [(w['name'], w['id']) for w in workflows]
+            w_choice = inquirer.prompt([inquirer.List("w", message="Select workflow to trigger", choices=choices)])["w"]
+            ref = input("Enter ref (branch/tag) [main]: ") or "main"
+            
+            trigger_url = f"{base_url}/workflows/{w_choice}/dispatches"
+            github_request("POST", trigger_url, github_token, json={"ref": ref})
+            print_success(f"Successfully triggered workflow run on {ref}")
 
-        elif action == "monitor":
-            url = f"{base_url}/runs"
-            response = requests.get(url, headers=headers)
-            response.raise_for_status()
-            runs = response.json()["workflow_runs"]
-            if runs:
-                print(f"Workflow runs for {repo_name}:")
-                for run in runs:
-                    print(f"- ID: {run['id']}, Status: {run['status']}, Conclusion: {run['conclusion']}")
-            else:
-                print(f"No workflow runs found for {repo_name}.")
+        elif action == "Monitor Status & Metrics":
+            print_info(f"Fetching execution metrics for {repo_name}...")
+            run_resp = github_request("GET", f"{base_url}/runs", github_token, params={"per_page": 10})
+            runs = run_resp.json().get("workflow_runs", [])
+            
+            if not runs:
+                print_info("No recent runs found.")
+                return
 
-    except requests.exceptions.RequestException as e:
-        print(f"An error occurred while communicating with the GitHub API: {e}")
+            print("\n[bold]Recent Workflow Runs & Metrics:[/bold]")
+            success_count = 0
+            for run in runs:
+                status_icon = "🟢" if run['conclusion'] == "success" else "🔴" if run['conclusion'] == "failure" else "⏳"
+                if run['conclusion'] == "success": success_count += 1
+                
+                duration = "N/A"
+                if run.get('updated_at') and run.get('run_started_at'):
+                    # Simple duration string logic
+                    duration = "Done" 
+
+                print(f"{status_icon} ID: {run['id']} | {run['name']} | Status: {run['status']} | Result: {run['conclusion']}")
+            
+            success_rate = (success_count / len(runs)) * 100
+            print(f"\n[bold cyan]Success Rate (Last 10): {success_rate:.0f}%[/bold cyan]")
+
+        elif "Workflow" in action:
+            enable = "Enable" in action
+            w_resp = github_request("GET", f"{base_url}/workflows", github_token)
+            workflows = w_resp.json().get("workflows", [])
+            choices = [(w['name'], w['id']) for w in workflows]
+            w_choice = inquirer.prompt([inquirer.List("w", message=f"Select workflow to {action.lower()}", choices=choices)])["w"]
+            
+            toggle_workflow_api(github_username, repo_name, github_token, w_choice, enable=enable)
+            print_success(f"Workflow {action.lower()}d successfully.")
+
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print_error(f"Actions operation failed: {e}")

@@ -12,6 +12,7 @@ setup(
         'pip-audit',
         'inquirer',
         'rich',
+        'beautifulsoup4',
         'pytest' # For development/testing purposes
     ],
     entry_points={

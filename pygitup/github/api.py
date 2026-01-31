@@ -139,6 +139,11 @@ def get_repo_contents(username, repo_name, token, path=""):
     url = f"https://api.github.com/repos/{username}/{repo_name}/contents/{path}"
     return github_request("GET", url, token)
 
+def get_user_repos(token):
+    """List all repositories for the authenticated user."""
+    url = "https://api.github.com/user/repos"
+    return github_request("GET", url, token, params={"per_page": 100})
+
 def update_repo_visibility(username, repo_name, token, private):
     """Update the visibility of a repository."""
     url = f"https://api.github.com/repos/{username}/{repo_name}"
@@ -149,3 +154,26 @@ def delete_repo_api(username, repo_name, token):
     """Delete a GitHub repository."""
     url = f"https://api.github.com/repos/{username}/{repo_name}"
     return github_request("DELETE", url, token)
+
+# --- ADVANCED ENHANCEMENT ENDPOINTS ---
+
+def get_workflow_run_logs(username, repo_name, token, run_id):
+    """Download logs for a specific workflow run."""
+    url = f"https://api.github.com/repos/{username}/{repo_name}/actions/runs/{run_id}/logs"
+    return github_request("GET", url, token)
+
+def toggle_workflow_api(username, repo_name, token, workflow_id, enable=True):
+    """Enable or disable a specific workflow."""
+    status = "enable" if enable else "disable"
+    url = f"https://api.github.com/repos/{username}/{repo_name}/actions/workflows/{workflow_id}/{status}"
+    return github_request("PUT", url, token)
+
+def get_dependabot_alerts(username, repo_name, token):
+    """Fetch Dependabot alerts for a repository."""
+    url = f"https://api.github.com/repos/{username}/{repo_name}/dependabot/alerts"
+    return github_request("GET", url, token)
+
+def get_secret_scanning_alerts(username, repo_name, token):
+    """Fetch Secret Scanning alerts for a repository."""
+    url = f"https://api.github.com/repos/{username}/{repo_name}/secret-scanning/alerts"
+    return github_request("GET", url, token)
