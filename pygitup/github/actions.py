@@ -52,16 +52,20 @@ def manage_actions(args, github_username, github_token):
 
             print("\n[bold]Recent Workflow Runs & Metrics:[/bold]")
             success_count = 0
+            from datetime import datetime
             for run in runs:
                 status_icon = "🟢" if run['conclusion'] == "success" else "🔴" if run['conclusion'] == "failure" else "⏳"
                 if run['conclusion'] == "success": success_count += 1
                 
-                duration = "N/A"
+                duration_str = "N/A"
                 if run.get('updated_at') and run.get('run_started_at'):
-                    # Simple duration string logic
-                    duration = "Done" 
+                    start = datetime.fromisoformat(run['run_started_at'].replace('Z', '+00:00'))
+                    end = datetime.fromisoformat(run['updated_at'].replace('Z', '+00:00'))
+                    diff = end - start
+                    minutes, seconds = divmod(diff.total_seconds(), 60)
+                    duration_str = f"{int(minutes)}m {int(seconds)}s"
 
-                print(f"{status_icon} ID: {run['id']} | {run['name']} | Status: {run['status']} | Result: {run['conclusion']}")
+                print(f"{status_icon} ID: {run['id']} | {run['name']} | Time: {duration_str} | Result: {run['conclusion']}")
             
             success_rate = (success_count / len(runs)) * 100
             print(f"\n[bold cyan]Success Rate (Last 10): {success_rate:.0f}%[/bold cyan]")
