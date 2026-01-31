@@ -139,6 +139,11 @@ def get_repo_contents(username, repo_name, token, path=""):
     url = f"https://api.github.com/repos/{username}/{repo_name}/contents/{path}"
     return github_request("GET", url, token)
 
+def search_user_by_email(email, token):
+    """Find a GitHub user by their email address."""
+    url = f"https://api.github.com/search/users"
+    return github_request("GET", url, token, params={"q": f"{email} in:email"})
+
 def get_user_repos(token):
     """List all repositories for the authenticated user."""
     url = "https://api.github.com/user/repos"
