@@ -17,7 +17,7 @@ RESET = "\033[0m"
 # Collection of 30 Block/Mixed Style Banners
 BANNERS = [
     # 1. Heavy Block Standard
-    f"""{CYAN}{BOLD}
+    rf"""{CYAN}{BOLD}
   _____       _____ _ _   _   _       
  |  __ \     / ____(_) | | | | |      
  | |__) |   | |  __ _| |_| | | |_ __  
@@ -29,7 +29,7 @@ BANNERS = [
 {RESET}""",
 
     # 2. ANSI Shadow
-    f"""{MAGENTA}{BOLD}
+    rf"""{MAGENTA}{BOLD}
 ██████╗ ██╗   ██╗ ██████╗ ██╗████████╗██╗   ██╗██████╗ 
 ██╔══██╗╚██╗ ██╔╝██╔════╝ ██║╚══██╔══╝██║   ██║██╔══██╗
 ██████╔╝ ╚████╔╝ ██║  ███╗██║   ██║   ██║   ██║██████╔╝
@@ -39,7 +39,7 @@ BANNERS = [
 {RESET}""",
 
     # 3. Slant Block
-    f"""{BLUE}{BOLD}
+    rf"""{BLUE}{BOLD}
     ____        ______(_) /  / /  / /___
    / __ \__  __/ ____/ / __/ / / / / __ \
   / /_/ / / / / / __/ / /_/ /_/ / / /_/ /
@@ -48,7 +48,7 @@ BANNERS = [
 {RESET}""",
 
     # 4. 3D Diagonal
-    f"""{GREEN}{BOLD}
+    rf"""{GREEN}{BOLD}
     ____             __________ __  __  __   
    / __ \__  __     / ____/(_)_/ /_/ / / /___
   / /_/ / / / /    / / __/ / __/ __/ / / / __ \
@@ -58,7 +58,7 @@ BANNERS = [
 {RESET}""",
 
     # 5. Rounded Block
-    f"""{YELLOW}{BOLD}
+    rf"""{YELLOW}{BOLD}
  _____       _____ _ _   _   _       
 |  __ \     / ____(_) | | | | |      
 | |__) |   | |  __ _| |_| | | |_ __  
@@ -70,13 +70,13 @@ BANNERS = [
 {RESET}""",
 
     # 6. Futuristic
-    f"""{RED}{BOLD}
+    rf"""{RED}{BOLD}
 PYGITUP  >>>  SYSTEM READY
 [ P Y G I T U P ]
 {RESET}""",
 
     # 7. Iso Block
-    f"""{WHITE}{BOLD}
+    rf"""{WHITE}{BOLD}
       ___           ___           ___           ___           ___           ___           ___     
      /\  \         |\__\         /::\  \       _\:\  \        \:\  \       /:/  /        /::\  \   
     /::\  \        |:|  |       /::\  \     /\ \:\  \        \:\  \     /:/  /  ___   /:/\:\__\  
@@ -91,7 +91,7 @@ PYGITUP  >>>  SYSTEM READY
 {RESET}""",
 
     # 8. Cyber Large
-    f"""{CYAN}{BOLD}
+    rf"""{CYAN}{BOLD}
 P Y G I T U P
 #############
 # CORE INIT #
@@ -99,20 +99,20 @@ P Y G I T U P
 {RESET}""",
 
     # 9. DOS Style
-    f"""{MAGENTA}{BOLD}
+    rf"""{MAGENTA}{BOLD}
 C:\> RUN PYGITUP.EXE
 [████████████████] 100%
 {RESET}""",
 
     # 10. Star Wars Style
-    f"""{YELLOW}{BOLD}
+    rf"""{YELLOW}{BOLD}
 PyGitUp
 The Force of Git Automation
 ___________________________
 {RESET}""",
 
     # 11. Bubble
-    f"""{BLUE}{BOLD}
+    rf"""{BLUE}{BOLD}
   _   _   _   _   _   _   _  
  / \ / \ / \ / \ / \ / \ / \
 ( P | y | G | i | t | U | p )
@@ -120,27 +120,27 @@ ___________________________
 {RESET}""",
 
     # 12. Digital
-    f"""{GREEN}{BOLD}
+    rf"""{GREEN}{BOLD}
  +-+-+-+-+-+-+-+
  |P|y|G|i|t|U|p|
  +-+-+-+-+-+-+-+
 {RESET}""",
 
     # 13. Blocks & Lines
-    f"""{RED}{BOLD}
+    rf"""{RED}{BOLD}
 ||||| PYGITUP |||||
 \\\ AUTOMATION /////
 {RESET}""",
 
     # 14. Retro Computer
-    f"""{WHITE}{BOLD}
+    rf"""{WHITE}{BOLD}
 ***********************
 *  P Y G I T U P  1.0 *
 ***********************
 {RESET}""",
 
     # 15. Slash
-    f"""{CYAN}{BOLD}
+    rf"""{CYAN}{BOLD}
    / // / // / // / // / // / /
   / // / // / // / // / // / /
  / // / // / // / // / // / /
@@ -149,39 +149,39 @@ PYGITUP - GIT AUTOMATION
 {RESET}""",
 
     # 16. Thick
-    f"""{MAGENTA}{BOLD}
+    rf"""{MAGENTA}{BOLD}
 =========================
  P  Y  G  I  T  U  P
 =========================
 {RESET}""",
 
     # 17. Stencil
-    f"""{YELLOW}{BOLD}
+    rf"""{YELLOW}{BOLD}
   P  Y  G  I  T  U  P  
  [=][=][=][=][=][=][=] 
 {RESET}""",
 
     # 18. Minimal Block
-    f"""{BLUE}{BOLD}
+    rf"""{BLUE}{BOLD}
 █▀█ █▄█ █▀▀ █ ▀█▀ █ █ █▀█
 █▀▀  █  █▄█ █  █  █▄█ █▀▀
 {RESET}""",
 
     # 19. Arrows
-    f"""{GREEN}{BOLD}
+    rf"""{GREEN}{BOLD}
 >>>>> PYGITUP >>>>>
 <<<<< AUTOMATION <<<<<
 {RESET}""",
 
     # 20. Double Border
-    f"""{RED}{BOLD}
+    rf"""{RED}{BOLD}
 ╔═════════════════════╗
 ║      PYGITUP        ║
 ╚═════════════════════╝
 {RESET}""",
 
     # 21. Gothic
-    f"""{WHITE}{BOLD}
+    rf"""{WHITE}{BOLD}
  ___        ____ _ _   _   _       
 |  _ \ _   / ___(_) |_| | | |_ __  
 | |_) | | | |  _| | __| | | | '_ \ 
@@ -191,14 +191,14 @@ PYGITUP - GIT AUTOMATION
 {RESET}""",
 
     # 22. Small Block
-    f"""{CYAN}{BOLD}
+    rf"""{CYAN}{BOLD}
 ┌─┐┬ ┬┌─┐┬┌┬┐┬ ┬┌─┐
 ├─┘└┬┘│ ┬│ │ │ │├─┘
 ┴   ┴ └─┘┴ ┴ └─┘┴  
 {RESET}""",
 
     # 23. Isometric 3
-    f"""{MAGENTA}{BOLD}
+    rf"""{MAGENTA}{BOLD}
       ___           ___           ___     
      /  /\         /  /\         /  /\    
     /  /:/:\       /  /:/:\       /  /:/_   
@@ -213,14 +213,14 @@ PYGITUP - GIT AUTOMATION
 {RESET}""",
 
     # 24. Binary Style
-    f"""{BLUE}{BOLD}
+    rf"""{BLUE}{BOLD}
 01010000 01011001 01000111
 01001001 01010100 01010101
 01010000 [PYGITUP] 1.0
 {RESET}""",
 
     # 25. Slant (Lean)
-    f"""{GREEN}{BOLD}
+    rf"""{GREEN}{BOLD}
    __ _ _ _   _   _       
   / _(_) |_| | | |_ __  
  | | | | __| | | | '_ \ 
@@ -230,7 +230,7 @@ PYGITUP - GIT AUTOMATION
 {RESET}""",
 
     # 26. Blocky 2
-    f"""{YELLOW}{BOLD}
+    rf"""{YELLOW}{BOLD}
 .---.       .-. .---. . . .-. .-. 
 |   )      (   )|---  | |  |  |-' 
 |---  '     `--''     `-'  '  '   
@@ -238,7 +238,7 @@ PYGITUP - GIT AUTOMATION
 {RESET}""",
 
     # 27. Ghost Style
-    f"""{RED}{BOLD}
+    rf"""{RED}{BOLD}
 .-. .-. .-. .-. .-. .-. .-. 
 | | | | | | | | | | | | | | 
 |-' `-' `-' `-' `-' `-' |-' 
@@ -246,7 +246,7 @@ PYGITUP - GIT AUTOMATION
 {RESET}""",
 
     # 28. Standard Sans
-    f"""{WHITE}{BOLD}
+    rf"""{WHITE}{BOLD}
  ___  _ _  ___  _  ___  _ _  ___
 | . \| | ||  _>| ||_ _|| | || . \
 |  _/`_. || <_ | | | | | | ||  _/
@@ -254,7 +254,7 @@ PYGITUP - GIT AUTOMATION
 {RESET}""",
 
     # 29. Bold Script
-    f"""{CYAN}{BOLD}
+    rf"""{CYAN}{BOLD}
   _ __ _ _  __ _ _ _  _ _ __ 
  | '_ \ | |/ _` | | | | | '_ \
  | |_) | | | (_| | | |_| | |_) |
@@ -263,7 +263,7 @@ PYGITUP - GIT AUTOMATION
 {RESET}""",
 
     # 30. Dot Matrix
-    f"""{MAGENTA}{BOLD}
+    rf"""{MAGENTA}{BOLD}
 ::: ::: :::::: ::: ::: ::: ::: ::: :::
 ::: ::: ::     :::  ::  :: ::: ::: :::
 ::::::  :::::  :::  ::  :: ::: ::: :::::
