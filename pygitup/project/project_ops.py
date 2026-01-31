@@ -5,6 +5,7 @@ import base64
 from tqdm import tqdm
 
 from ..github.api import update_file, get_file_info, create_repo, get_repo_info
+from ..utils.security import scan_directory_for_sensitive_files, audit_files_and_prompt, check_is_sensitive
 
 TQDM_AVAILABLE = True # Assume available for now
 
@@ -113,6 +114,12 @@ def upload_project_directory(github_username, github_token, config, args=None):
         return
 
     project_path, repo_name, repo_description, is_private = get_project_directory_input(config, args)
+    
+    # Run security scan on the directory
+    if not scan_directory_for_sensitive_files(project_path):
+        print("Upload cancelled due to security check.")
+        return
+
     initialize_git_repository(project_path)
     create_or_get_github_repository(repo_name, repo_description, is_private, github_username, github_token)
     push_to_github(repo_name, github_username, github_token)
@@ -188,6 +195,13 @@ def upload_single_file(github_username, github_token, config, args=None):
         return
 
     repo_name, local_file_path, repo_file_path, commit_message = get_single_file_input(config, args)
+
+    if check_is_sensitive(local_file_path):
+        print(f"\nWARNING: '{local_file_path}' appears to be a sensitive file.")
+        confirm = input("Are you sure you want to upload it? (y/n): ").lower()
+        if confirm != 'y':
+            print("Upload cancelled.")
+            return False
 
     try:
         with open(local_file_path, "rb") as f:
@@ -287,6 +301,12 @@ def upload_batch_files(github_username, github_token, config, args=None):
     
     if not files:
         return
+
+    # Security check for batch files
+    files = audit_files_and_prompt(files)
+    if not files:
+        print("No files to upload after security check.")
+        return
     
     print(f"\nUploading {len(files)} files to {repo_name}...")
     
@@ -361,6 +381,14 @@ def update_multiple_repos(github_username, github_token, config, args=None):
 
     repo_names, file_path, repo_file_path, commit_message = get_multi_repo_input(config, args)
     
+    # Security check
+    if check_is_sensitive(file_path):
+        print(f"\nWARNING: '{file_path}' appears to be a sensitive file.")
+        confirm = input("Are you sure you want to update this file across multiple repositories? (y/n): ").lower()
+        if confirm != 'y':
+            print("Multi-repo update cancelled.")
+            return
+
     # Filter out any empty repository names that might result from trailing commas
     repo_names = [name for name in repo_names if name]
 

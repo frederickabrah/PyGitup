@@ -1,6 +1,5 @@
-
 import inquirer
-from .api import update_repo_visibility
+from .api import update_repo_visibility, delete_repo_api
 
 def manage_repo_visibility(args, github_username, github_token):
     """Handle repository visibility changes."""
@@ -53,6 +52,43 @@ def manage_repo_visibility(args, github_username, github_token):
         else:
             print(f"Failed to change visibility: {response.status_code} - {response.text}")
             print("Note: You need admin access to the repository to change its visibility.")
+            
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+def delete_repository(args, github_username, github_token):
+    """Delete a GitHub repository with safety confirmation."""
+    repo_name = args.repo if hasattr(args, 'repo') and args.repo else None
+
+    if not repo_name:
+        questions = [inquirer.Text("repo", message="Enter the name of the repository to DELETE")]
+        answers = inquirer.prompt(questions)
+        repo_name = answers["repo"]
+
+    if not repo_name:
+        print("Repository name is required.")
+        return
+
+    print("\n" + "!" * 50)
+    print(f"DANGER: You are about to PERMANENTLY DELETE '{repo_name}'")
+    print("!" * 50 + "\n")
+    
+    confirmation = input(f"To confirm, type '{repo_name}': ")
+    
+    if confirmation != repo_name:
+        print("Verification failed. Repository deletion cancelled.")
+        return
+
+    print(f"Deleting repository '{repo_name}'...")
+    
+    try:
+        response = delete_repo_api(github_username, repo_name, github_token)
+        
+        if response.status_code == 204:
+            print(f"Successfully deleted repository '{repo_name}'.")
+        else:
+            print(f"Failed to delete repository: {response.status_code} - {response.text}")
+            print("Note: You need 'delete_repo' scope in your token or admin access.")
             
     except Exception as e:
         print(f"An error occurred: {e}")

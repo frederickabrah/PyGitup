@@ -3,6 +3,7 @@ import inquirer
 import json
 from urllib.parse import urlparse
 from .api import get_repo_info
+from ..utils.ui import display_repo_info, print_header, print_error
 
 def parse_github_url(url):
     """Extract owner and repo name from a GitHub URL."""
@@ -32,7 +33,7 @@ def get_detailed_repo_info(args, github_token):
     owner, repo_name = parse_github_url(url)
     
     if not owner or not repo_name:
-        print("Error: Could not parse repository owner and name from the URL.")
+        print_error("Error: Could not parse repository owner and name from the URL.")
         print("Please ensure the URL is in the format: https://github.com/owner/repo")
         return
 
@@ -48,38 +49,12 @@ def get_detailed_repo_info(args, github_token):
         
         if response.status_code == 200:
             data = response.json()
-            print("\n" + "="*60)
-            print(f"  REPOSITORY INFORMATION REPORT: {data.get('full_name', f'{owner}/{repo_name}')}")
-            print("="*60 + "\n")
-            
-            # Print specific high-level summary first
-            print(f"Name:        {data.get('name')}")
-            print(f"Owner:       {data.get('owner', {}).get('login')}")
-            print(f"Visibility:  {'Private' if data.get('private') else 'Public'}")
-            print(f"Description: {data.get('description')}")
-            print(f"Language:    {data.get('language')}")
-            print(f"Stars:       {data.get('stargazers_count')}")
-            print(f"Forks:       {data.get('forks_count')}")
-            print(f"Watchers:    {data.get('watchers_count')}")
-            print(f"Issues:      {data.get('open_issues_count')} open")
-            print(f"Created At:  {data.get('created_at')}")
-            print(f"Last Push:   {data.get('pushed_at')}")
-            print(f"Clone URL:   {data.get('clone_url')}")
-            print("-" * 60)
-            print("FULL VERBOSE JSON OUTPUT:")
-            print("-" * 60)
-            
-            # Dump the full JSON
-            print(json.dumps(data, indent=4))
-            
-            print("\n" + "="*60)
-            print("  END OF REPORT")
-            print("="*60)
+            display_repo_info(data)
         else:
-            print(f"Error: Failed to fetch data (Status Code: {response.status_code})")
+            print_error(f"Error: Failed to fetch data (Status Code: {response.status_code})")
             print(f"Response: {response.text}")
             if response.status_code == 404:
                 print("Hint: The repository might not exist or is private (and your token lacks access).")
 
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        print_error(f"An unexpected error occurred: {e}")

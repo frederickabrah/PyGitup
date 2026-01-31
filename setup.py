@@ -11,6 +11,7 @@ setup(
         'tqdm',
         'pip-audit',
         'inquirer',
+        'rich',
         'pytest' # For development/testing purposes
     ],
     entry_points={
@@ -18,12 +19,12 @@ setup(
             'pygitup=pygitup.main:main',
         ],
     },
-    author='Your Name', # Placeholder, you can update this
-    author_email='your.email@example.com', # Placeholder, you can update this
+    author='Frederick Abraham',
+    author_email='frederickabraham547@gmail.com',
     description='A CLI tool to simplify and automate GitHub workflows.',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
-    url='https://github.com/frederickabrah/PyGitUp', # Placeholder, update with your actual repo
+    url='https://github.com/frederickabrqh/PyGitUp',
     classifiers=[
         'Programming Language :: Python :: 3',
         'License :: OSI Approved :: MIT License',

@@ -136,3 +136,10 @@ def update_repo_visibility(username, repo_name, token, private):
     data = {"private": private}
     response = requests.patch(url, headers=headers, json=data)
     return response
+
+def delete_repo_api(username, repo_name, token):
+    """Delete a GitHub repository."""
+    url = f"https://api.github.com/repos/{username}/{repo_name}"
+    headers = get_github_headers(token)
+    response = requests.delete(url, headers=headers)
+    return response

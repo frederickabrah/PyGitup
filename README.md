@@ -34,6 +34,7 @@ PyGitUp offers a wide array of functionalities to simplify your development proc
 *   **GitHub Actions Integration:** Trigger and monitor GitHub Actions workflows.
 *   **Pull Request Management:** Merge, close, and comment on pull requests.
 *   **Change Repository Visibility:** Easily switch an existing repository between public and private.
+*   **Delete Repository:** Permanently delete a GitHub repository directly from the terminal (includes a mandatory safety confirmation step).
 
 ### Utility & Analytics
 
@@ -41,6 +42,7 @@ PyGitUp offers a wide array of functionalities to simplify your development proc
 *   **Automated Documentation Generation:** Generate comprehensive documentation from code comments (now with robust AST-based parsing for Python, plus support for JavaScript, Java, C++, Go).
 *   **Collaboration Analytics:** Generate reports on team contributions, issue statistics, and more.
 *   **Security Auditing:** Scan project dependencies for known security vulnerabilities using `pip-audit`.
+*   **Security Interception Layer:** Automatically detects sensitive files (e.g., `.env`, `token.json`, private keys) or heavy directories (e.g., `node_modules`, `venv`) before upload, prompting you to skip them or add them to `.gitignore`.
 *   **Get Repository Info from URL:** Retrieve comprehensive, verbose information about any GitHub repository using its URL.
 
 ## Installation

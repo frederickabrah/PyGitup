@@ -3,3 +3,4 @@ PyYAML
 tqdm
 pip-audit
 inquirer
+rich
