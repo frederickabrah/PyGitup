@@ -3,6 +3,7 @@ import requests
 import inquirer
 
 from .api import get_github_headers
+from ..utils.security import check_is_sensitive
 
 def manage_gists(args, github_username, github_token):
     """Handle Gist management operations."""
@@ -35,6 +36,15 @@ def manage_gists(args, github_username, github_token):
             content = gist_answers["content"]
             description = gist_answers["description"]
             public = gist_answers["public"]
+
+    if action == "create":
+        # Security check for Gist filename
+        if check_is_sensitive(filename):
+            print(f"\nWARNING: '{filename}' appears to be a sensitive filename pattern.")
+            confirm = input("Are you sure you want to create this Gist? (y/n): ").lower()
+            if confirm != 'y':
+                print("Gist creation cancelled.")
+                return
 
     headers = get_github_headers(github_token)
 

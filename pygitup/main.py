@@ -1,4 +1,3 @@
-
 import sys
 
 from .core.args import create_parser
@@ -20,9 +19,10 @@ from .github.gists import manage_gists
 from .github.webhooks import manage_webhooks
 from .github.actions import manage_actions
 from .utils.security import run_audit
-from .github.repo import manage_repo_visibility
+from .github.repo import manage_repo_visibility, delete_repository
 from .github.repo_info import get_detailed_repo_info
 from .utils.banner import show_banner
+from .utils.ui import display_menu, print_error, print_success
 
 def main():
     """Main function to orchestrate the process."""
@@ -46,63 +46,40 @@ def main():
     # Determine mode
     mode = args.mode
     if not mode:
-        print("\nWhat would you like to do?")
-        print("1: Upload/update a whole project directory")
-        print("2: Upload/update a single file")
-        print("3: Batch upload multiple files")
-        print("4: Create project from template")
-        print("5: Create GitHub release")
-        print("6: Update file in multiple repositories")
-        print("7: Scan for TODOs and create issues")
-        print("8: Queue commit for offline")
-        print("9: Process offline commit queue")
-        print("10: Request code review")
-        print("11: Smart push with commit squashing")
-        print("12: Generate documentation")
-        print("13: Generate collaboration analytics")
-        print("14: Run the configuration wizard")
-        print("15: Manage branches")
-        print("16: Manage stashes")
-        print("17: Manage tags")
-        print("18: Cherry-pick a commit")
-        print("19: Manage Gists")
-        print("20: Manage Webhooks")
-        print("21: Manage GitHub Actions")
-        print("22: Manage Pull Requests")
-        print("23: Run security audit")
-        print("24: Change repository visibility")
-        print("25: Get repository info from URL")
-        choice = input("Enter your choice (1-25): ")
-        
-        modes = {
-            '1': "project",
-            '2': "file",
-            '3': "batch",
-            '4': "template",
-            '5': "release",
-            '6': "multi-repo",
-            '7': "scan-todos",
-            '8': "offline-queue",
-            '9': "process-queue",
-            '10': "request-review",
-            '11': "smart-push",
-            '12': "generate-docs",
-            '13': "analytics",
-            '14': "configure",
-            '15': "branch",
-            '16': "stash",
-            '17': "tag",
-            '18': "cherry-pick",
-            '19': "gist",
-            '20': "webhook",
-            '21': "actions",
-            '22': "pr",
-            '23': "audit",
-            '24': "visibility",
-            '25': "repo-info"
+        menu_options = {
+            '1': ("Upload/update a whole project directory", "project"),
+            '2': ("Upload/update a single file", "file"),
+            '3': ("Batch upload multiple files", "batch"),
+            '4': ("Create project from template", "template"),
+            '5': ("Create GitHub release", "release"),
+            '6': ("Update file in multiple repositories", "multi-repo"),
+            '7': ("Scan for TODOs and create issues", "scan-todos"),
+            '8': ("Queue commit for offline", "offline-queue"),
+            '9': ("Process offline commit queue", "process-queue"),
+            '10': ("Request code review", "request-review"),
+            '11': ("Smart push with commit squashing", "smart-push"),
+            '12': ("Generate documentation", "generate-docs"),
+            '13': ("Generate collaboration analytics", "analytics"),
+            '14': ("Run the configuration wizard", "configure"),
+            '15': ("Manage branches", "branch"),
+            '16': ("Manage stashes", "stash"),
+            '17': ("Manage tags", "tag"),
+            '18': ("Cherry-pick a commit", "cherry-pick"),
+            '19': ("Manage Gists", "gist"),
+            '20': ("Manage Webhooks", "webhook"),
+            '21': ("Manage GitHub Actions", "actions"),
+            '22': ("Manage Pull Requests", "pr"),
+            '23': ("Run security audit", "audit"),
+            '24': ("Change repository visibility", "visibility"),
+            '25': ("Get repository info from URL", "repo-info"),
+            '26': ("Delete GitHub repository", "delete-repo")
         }
+
+        display_menu(menu_options)
+        choice = input("\n👉 Enter your choice (1-26): ")
         
-        mode = modes.get(choice, "")
+        selected_option = menu_options.get(choice)
+        mode = selected_option[1] if selected_option else ""
 
     # Execute the corresponding function based on the mode
     if mode == "project":
@@ -155,9 +132,10 @@ def main():
         manage_repo_visibility(args, github_username, github_token)
     elif mode == "repo-info":
         get_detailed_repo_info(args, github_token)
+    elif mode == "delete-repo":
+        delete_repository(args, github_username, github_token)
     else:
-        print("Invalid mode. Exiting.")
+        print_error("Invalid mode selected. Exiting.")
         sys.exit(1)
 
-    print("--------------------")
-    print("Operation complete.")
+    print_success("Operation complete.")

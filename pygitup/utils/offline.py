@@ -3,6 +3,7 @@ import json
 from datetime import datetime
 
 from ..github.api import update_file
+from .security import check_is_sensitive
 
 def queue_offline_commit(config, args=None):
     """Queue a commit for when online."""
@@ -25,6 +26,14 @@ def queue_offline_commit(config, args=None):
         file_path = args.file
     else:
         file_path = input("Enter file to commit: ")
+    
+    # Security check
+    if check_is_sensitive(file_path):
+        print(f"\nWARNING: '{file_path}' appears to be a sensitive file.")
+        confirm = input("Are you sure you want to queue this file for upload? (y/n): ").lower()
+        if confirm != 'y':
+            print("Queuing cancelled.")
+            return
     
     # Create queue entry
     queue_entry = {
