@@ -32,7 +32,7 @@ PyGitUp is basically a dashboard for your terminal. It’s got 26 modes, but her
 
 ```bash
 # Clone it
-git clone https://github.com/frederickabrqh/PyGitUp.git
+git clone https://github.com/frederickabrah/PyGitUp.git
 cd PyGitUp
 
 # Grab the dependencies
@@ -69,9 +69,9 @@ Think of it less as a donation and more as a strategic investment in your own fu
 *   **Fewer Bugs:** Every bug squashed is a victory for developer sanity.
 *   **The Ultimate Fuel:** Coffee. Lots and lots of coffee. You provide the caffeine, I provide the code that makes your life easier.
 
-**[➡️ Become a GitHub Sponsor!](https://github.com/sponsors/frederickabrqh)**
+**[➡️ Become a GitHub Sponsor!](https://github.com/sponsors/frederickabrah)**
 
-**[☕ Buy Me a Coffee](https://www.buymeacoffee.com/frederickabrqh)**
+**[☕ Buy Me a Coffee](https://www.buymeacoffee.com/frederickabrah)**
 
 ---
 

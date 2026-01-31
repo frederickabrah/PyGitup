@@ -25,7 +25,7 @@ setup(
     description='A CLI tool to simplify and automate GitHub workflows.',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
-    url='https://github.com/frederickabrqh/PyGitUp',
+    url='https://github.com/frederickabrah/PyGitUp',
     classifiers=[
         'Programming Language :: Python :: 3',
         'License :: OSI Approved :: MIT License',
