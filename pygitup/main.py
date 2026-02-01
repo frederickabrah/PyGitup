@@ -22,7 +22,7 @@ from .utils.security import run_audit
 from .github.repo import manage_repo_visibility, delete_repository
 from .github.repo_info import get_detailed_repo_info
 from .utils.banner import show_banner
-from .utils.ui import display_menu, print_error, print_success
+from .utils.ui import display_menu, print_error, print_success, print_info
 from .utils.update import check_for_updates
 
 def main():
@@ -37,6 +37,13 @@ def main():
     # Load configuration
     config = load_config(args.config)
     
+    # Auto-Setup Wizard if credentials missing
+    if not config["github"].get("username") or not config["github"].get("token"):
+        print_info("No existing credentials found. Starting stealth setup...")
+        configuration_wizard()
+        # Reload after setup
+        config = load_config(args.config)
+
     # Get credentials
     github_username = get_github_username(config)
     github_token = get_github_token(config)
