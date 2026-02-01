@@ -246,64 +246,306 @@ def get_github_username(config):
 
 def configuration_wizard(profile_name=None):
 
+
+
     """Guides the user through one-time stealth setup for a specific profile."""
+
+
 
     print_header("PyGitUp Stealth Setup")
 
+
+
     
+
+
 
     if not profile_name:
 
+
+
         profile_name = input("🏷️ Enter a name for this profile (e.g., work, personal) [default]: ") or "default"
+
+
 
     
 
-    print_info(f"Configuring profile: {profile_name}")
 
-
-
-    config = DEFAULT_CONFIG.copy()
 
     config_path = os.path.join(get_config_dir(), "profiles", f"{profile_name}.yaml")
 
 
 
-    config["github"]["username"] = input(f'GitHub username: ') or config["github"]["username"]
+    existing_config = {}
 
-    token = getpass.getpass("GitHub Token (Hidden): ")
 
-    config["github"]["token"] = token 
 
-    
+    mode = "overwrite" # default
 
-    ai_key = getpass.getpass("Gemini API Key (Hidden): ")
 
-    config["github"]["ai_api_key"] = ai_key
+
+
+
+
+
+    if os.path.exists(config_path):
+
+
+
+        print_warning(f"Configuration for profile '{profile_name}' already exists.")
+
+
+
+        print("1: [red]Overwrite completely[/red]")
+
+
+
+        print("2: [green]Fill missing values only[/green]")
+
+
+
+        print("3: [white]Cancel[/white]")
+
+
+
+        
+
+
+
+        choice = input("\n👉 Choice (1-3): ")
+
+
+
+        if choice == '3':
+
+
+
+            print_info("Setup cancelled.")
+
+
+
+            return
+
+
+
+        elif choice == '2':
+
+
+
+            mode = "fill_missing"
+
+
+
+            # Load existing
+
+
+
+            try:
+
+
+
+                with open(config_path, 'r') as f:
+
+
+
+                    existing_config = yaml.safe_load(f) or {}
+
+
+
+            except Exception:
+
+
+
+                pass
+
+
+
+
+
+
+
+    print_info(f"Configuring profile: {profile_name} ({mode})")
+
+
+
+
+
+
+
+    # Start with default structure, update with existing if filling
+
+
+
+    config = DEFAULT_CONFIG.copy()
+
+
+
+    if mode == "fill_missing" and existing_config:
+
+
+
+        # Deep merge
+
+
+
+        for section in existing_config:
+
+
+
+            if section in config:
+
+
+
+                config[section].update(existing_config[section])
+
+
+
+
+
+
+
+    # Username
+
+
+
+    current_user = config["github"].get("username", "")
+
+
+
+    if mode == "overwrite" or not current_user:
+
+
+
+        val = input(f'GitHub username: ')
+
+
+
+        if val: config["github"]["username"] = val
+
+
+
+    else:
+
+
+
+        print_info(f"Username already set: {current_user}")
+
+
+
+
+
+
+
+    # GitHub Token
+
+
+
+    current_token = config["github"].get("token", "")
+
+
+
+    if mode == "overwrite" or not current_token:
+
+
+
+        val = getpass.getpass("GitHub Token (Hidden): ")
+
+
+
+        if val: config["github"]["token"] = val
+
+
+
+    else:
+
+
+
+        print_info("GitHub Token already set.")
+
+
+
+
+
+
+
+    # AI API Key
+
+
+
+    current_ai = config["github"].get("ai_api_key", "")
+
+
+
+    if mode == "overwrite" or not current_ai:
+
+
+
+        val = getpass.getpass("Gemini API Key (Hidden): ")
+
+
+
+        if val: config["github"]["ai_api_key"] = val
+
+
+
+    else:
+
+
+
+        print_info("Gemini API Key already set.")
+
+
+
+
 
 
 
     try:
 
+
+
         # Secure the file permissions
+
+
 
         with open(config_path, "w") as f:
 
+
+
             yaml.dump(config, f, default_flow_style=False)
+
+
 
         
 
+
+
         if os.name != 'nt':
+
+
 
             os.chmod(config_path, 0o600)
 
+
+
             
+
+
 
         # Automatically set as active if it's the only one or if user wants
 
+
+
         set_active_profile(profile_name)
 
-        print_success(f"\nProfile '{profile_name}' locked and activated!")
+
+
+        print_success(f"\nProfile '{profile_name}' updated and activated!")
+
+
 
     except Exception as e:
+
+
 
         print_error(f"\nError locking profile: {e}")
