@@ -2,7 +2,7 @@ import os
 import subprocess
 import tempfile
 from .api import create_release, get_commit_history
-from ..utils.ui import print_success, print_error, print_info, print_header, print_warning
+from ..utils.ui import print_success, print_error, print_info, print_header, print_warning, console
 from ..utils.ai import generate_ai_release_notes
 
 def open_editor(initial_content=""):
@@ -42,11 +42,11 @@ def get_release_input(config, args, github_username, github_token):
     
     # Release Notes Logic
     changelog = ""
-    print("\n[bold]Release Notes Options:[/bold]")
-    print("1: [cyan]AI-Generated Summary[/cyan]")
-    print("2: [green]Auto-Changelog (Commit list)[/green]")
-    print("3: [yellow]Manual Editor (Nano/Vim)[/yellow]")
-    print("4: [white]Skip / Basic prompt[/white]")
+    console.print("\n[bold]Release Notes Options:[/bold]")
+    console.print("1: [cyan]AI-Generated Summary[/cyan]")
+    console.print("2: [green]Auto-Changelog (Commit list)[/green]")
+    console.print("3: [yellow]Manual Editor (Nano/Vim)[/yellow]")
+    console.print("4: [white]Skip / Basic prompt[/white]")
     
     note_choice = input("\n👉 Choice: ")
     

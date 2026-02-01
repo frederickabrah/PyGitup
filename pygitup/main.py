@@ -1,4 +1,5 @@
 import sys
+import os
 
 from .core.args import create_parser
 from .core.config import load_config, get_github_username, get_github_token, configuration_wizard, list_profiles, set_active_profile, get_active_profile_path
@@ -23,7 +24,7 @@ from .utils.security import run_audit
 from .github.repo import manage_repo_visibility, delete_repository
 from .github.repo_info import get_detailed_repo_info, get_fork_intelligence, parse_github_url
 from .utils.banner import show_banner
-from .utils.ui import display_menu, print_error, print_success, print_info
+from .utils.ui import display_menu, print_error, print_success, print_info, console
 from .utils.update import check_for_updates
 
 def main():
@@ -195,23 +196,22 @@ def main():
                     print_error("Invalid repository URL.")
             elif mode == "ai-commit":
                 ai_commit_workflow(github_username, github_token, config)
-            elif mode == "accounts":
-                print_header("Account & Profile Manager")
-                profiles = list_profiles()
-                active_path = get_active_profile_path()
-                active_name = os.path.basename(active_path).replace(".yaml", "")
-
-                print_info(f"Current Active Profile: [bold green]{active_name}[/bold green]")
-                print("\nAvailable Profiles:")
-                for p in profiles:
-                    marker = "➜ " if p == active_name else "  "
-                    print(f"{marker}{p}")
-                
-                print("\n[bold]Options:[/bold]")
-                print("1: Switch Profile")
-                print("2: Add New Account")
-                print("3: Back")
-                
+                    elif mode == "accounts":
+                        print_header("Account & Profile Manager")
+                        profiles = list_profiles()
+                        active_path = get_active_profile_path()
+                        active_name = os.path.basename(active_path).replace(".yaml", "")
+            
+                        console.print(f"Current Active Profile: [bold green]{active_name}[/bold green]")
+                        print("\nAvailable Profiles:")
+                        for p in profiles:
+                            marker = "➜ " if p == active_name else "  "
+                            print(f"{marker}{p}")
+                        
+                        console.print("\n[bold]Options:[/bold]")
+                        print("1: Switch Profile")
+                        print("2: Add New Account")
+                        print("3: Back")                
                 acc_choice = input("\n👉 Choice: ")
                 if acc_choice == '1':
                     target = input("Enter profile name to switch to: ")
