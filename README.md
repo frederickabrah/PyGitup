@@ -28,6 +28,16 @@ PyGitUp is basically a dashboard for your terminal. It’s got 26 modes, but her
 
 ---
 
+## 📺 Coming Soon: The PyGitUp TUI Dashboard
+
+We're taking PyGitUp to the next level. We are currently architecting a full **Text User Interface (TUI)** mode. 
+
+Imagine `lazygit` combined with a high-fidelity intelligence dashboard. Interactive sidebars, real-time repository health visualizations, and clickable OSINT reports—all without leaving your terminal. This will be the ultimate way to manage your GitHub ecosystem on both Desktop and Termux.
+
+**Stay tuned. The future of PyGitUp is reactive.**
+
+---
+
 ## How to get it running
 
 ```bash
