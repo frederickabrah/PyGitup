@@ -2,6 +2,7 @@
 import os
 import yaml
 import getpass
+import json
 from ..utils.ui import print_success, print_error, print_info, print_header, print_warning
 
 # Default configuration
