@@ -20,7 +20,7 @@ from .github.webhooks import manage_webhooks
 from .github.actions import manage_actions
 from .utils.security import run_audit
 from .github.repo import manage_repo_visibility, delete_repository
-from .github.repo_info import get_detailed_repo_info, get_fork_intelligence
+from .github.repo_info import get_detailed_repo_info, get_fork_intelligence, parse_github_url
 from .utils.banner import show_banner
 from .utils.ui import display_menu, print_error, print_success, print_info
 from .utils.update import check_for_updates
