@@ -1,6 +1,6 @@
 import inquirer
 from urllib.parse import urlparse
-from .api import get_repo_info, github_request, get_commit_history, get_issues, get_contributors
+from .api import get_repo_info, github_request, get_commit_history, get_issues, get_contributors, get_repo_languages, get_community_profile, get_latest_release
 from ..utils.ui import display_repo_info, display_traffic_trends, print_error, print_warning
 from ..utils.scraper import scrape_repo_info
 
@@ -101,6 +101,25 @@ def get_detailed_repo_info(args, github_token):
                 return
 
         repo_data = repo_response.json()
+
+        # OSINT Upgrade: Fetch deep metadata
+        try:
+            # Languages
+            lang_resp = get_repo_languages(owner, repo_name, github_token)
+            if lang_resp.status_code == 200:
+                repo_data['osint_languages'] = lang_resp.json()
+            
+            # Community Profile
+            comm_resp = get_community_profile(owner, repo_name, github_token)
+            if comm_resp.status_code == 200:
+                repo_data['osint_community'] = comm_resp.json()
+            
+            # Latest Release
+            rel_resp = get_latest_release(owner, repo_name, github_token)
+            if rel_resp.status_code == 200:
+                repo_data['osint_release'] = rel_resp.json()
+        except Exception:
+            pass
 
         # Add traffic analytics (requires push access)
         traffic_data = {}

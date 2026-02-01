@@ -89,6 +89,36 @@ def display_repo_info(data):
     for label, value in fields.items():
         grid.add_row(f"{label}:", str(value))
 
+    # OSINT: Languages Section
+    if 'osint_languages' in data and data['osint_languages']:
+        langs = data['osint_languages']
+        total_bytes = sum(langs.values())
+        lang_str = ""
+        for name, bytes_count in sorted(langs.items(), key=lambda x: x[1], reverse=True)[:5]:
+            percentage = (bytes_count / total_bytes) * 100
+            lang_str += f"{name} ({percentage:.1f}%) "
+        grid.add_row("Languages:", lang_str.strip())
+
+    # OSINT: Community Profile
+    if 'osint_community' in data and data['osint_community']:
+        comm = data['osint_community']
+        grid.add_row("", "")
+        grid.add_row("[bold]Community Intelligence[/bold]", f"Health Score: [bold green]{comm.get('health_percentage')}%[/bold green]")
+        
+        files = comm.get('files', {})
+        readme = "✅" if files.get('readme') else "❌"
+        license = "✅" if files.get('license') else "❌"
+        coc = "✅" if files.get('code_of_conduct') else "❌"
+        grid.add_row("Documentation:", f"README: {readme} | LICENSE: {license} | CoC: {coc}")
+
+    # OSINT: Release Summary
+    if 'osint_release' in data and data['osint_release']:
+        rel = data['osint_release']
+        grid.add_row("", "")
+        grid.add_row("[bold]Latest Intelligence[/bold]", "")
+        grid.add_row("Version:", f"{rel.get('tag_name')} ({rel.get('name')})")
+        grid.add_row("Released:", rel.get('published_at', '')[:10])
+
     # Health & Activity Section
     if 'health' in data and data['health']:
         health = data['health']
