@@ -5,6 +5,7 @@ import subprocess
 import hashlib
 from ..github.api import create_issue, get_issues, search_user_by_email
 from ..utils.ui import print_success, print_error, print_info, print_warning
+from ..utils.ai import suggest_todo_fix
 
 def get_git_author(file_path, line_num):
     """Extracts the author's email for a specific line using git blame."""
@@ -100,6 +101,15 @@ def scan_todos(github_username, github_token, config, args=None):
             body += f"- **Blame:** {todo['author']}\n"
         
         body += f"\n### Context\n{todo['context']}\n\n"
+        
+        # AI: Suggest Fix
+        ai_key = config["github"].get("ai_api_key")
+        if ai_key:
+            print_info(f"🤖 AI is suggesting a fix for: {title}")
+            fix_suggestion = suggest_todo_fix(ai_key, todo['comment'], todo['context'])
+            if fix_suggestion:
+                body += f"### 💡 AI-Suggested Fix\n{fix_suggestion}\n\n"
+
         body += "_Generated automatically by PyGitUp Smart Issue engine._"
 
         if args and args.dry_run:
