@@ -196,22 +196,23 @@ def main():
                     print_error("Invalid repository URL.")
             elif mode == "ai-commit":
                 ai_commit_workflow(github_username, github_token, config)
-                    elif mode == "accounts":
-                        print_header("Account & Profile Manager")
-                        profiles = list_profiles()
-                        active_path = get_active_profile_path()
-                        active_name = os.path.basename(active_path).replace(".yaml", "")
-            
-                        console.print(f"Current Active Profile: [bold green]{active_name}[/bold green]")
-                        print("\nAvailable Profiles:")
-                        for p in profiles:
-                            marker = "➜ " if p == active_name else "  "
-                            print(f"{marker}{p}")
-                        
-                        console.print("\n[bold]Options:[/bold]")
-                        print("1: Switch Profile")
-                        print("2: Add New Account")
-                        print("3: Back")                
+            elif mode == "accounts":
+                print_header("Account & Profile Manager")
+                profiles = list_profiles()
+                active_path = get_active_profile_path()
+                active_name = os.path.basename(active_path).replace(".yaml", "")
+
+                console.print(f"Current Active Profile: [bold green]{active_name}[/bold green]")
+                print("\nAvailable Profiles:")
+                for p in profiles:
+                    marker = "➜ " if p == active_name else "  "
+                    print(f"{marker}{p}")
+                
+                console.print("\n[bold]Options:[/bold]")
+                print("1: Switch Profile")
+                print("2: Add New Account")
+                print("3: Back")
+                
                 acc_choice = input("\n👉 Choice: ")
                 if acc_choice == '1':
                     target = input("Enter profile name to switch to: ")
