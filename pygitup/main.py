@@ -52,114 +52,137 @@ def main():
     if args.mode != "process-queue":
         process_offline_queue(github_username, github_token, config)
     
-    # Determine mode
-    mode = args.mode
-    if not mode:
-        menu_options = {
-            '1': ("Upload/update a whole project directory", "project"),
-            '2': ("Upload/update a single file", "file"),
-            '3': ("Batch upload multiple files", "batch"),
-            '4': ("Create project from template", "template"),
-            '5': ("Create GitHub release", "release"),
-            '6': ("Update file in multiple repositories", "multi-repo"),
-            '7': ("Scan for TODOs and create issues", "scan-todos"),
-            '8': ("Queue commit for offline", "offline-queue"),
-            '9': ("Process offline commit queue", "process-queue"),
-            '10': ("Request code review", "request-review"),
-            '11': ("Smart push with commit squashing", "smart-push"),
-            '12': ("Generate documentation", "generate-docs"),
-            '13': ("Generate collaboration analytics", "analytics"),
-            '14': ("Run the configuration wizard", "configure"),
-            '15': ("Manage branches", "branch"),
-            '16': ("Manage stashes", "stash"),
-            '17': ("Manage tags", "tag"),
-            '18': ("Cherry-pick a commit", "cherry-pick"),
-            '19': ("Manage Gists", "gist"),
-            '20': ("Manage Webhooks", "webhook"),
-            '21': ("Manage GitHub Actions", "actions"),
-            '22': ("Manage Pull Requests", "pr"),
-            '23': ("Run security audit (Local + GitHub)", "audit"),
-            '24': ("Change repository visibility", "visibility"),
-            '25': ("Get repository info from URL", "repo-info"),
-            '26': ("Delete GitHub repository", "delete-repo"),
-            '27': ("Bulk Repository Management & Health", "bulk-mgmt"),
-            '28': ("Migrate/Mirror Repository from any source", "migrate"),
-            '29': ("Network & Fork Intelligence (OSINT)", "fork-intel")
-        }
+    # Persistent loop for interactive mode
+    is_interactive = not args.mode
+    
+    while True:
+        # Determine mode
+        mode = args.mode
+        if not mode:
+            menu_options = {
+                '1': ("Upload/update a whole project directory", "project"),
+                '2': ("Upload/update a single file", "file"),
+                '3': ("Batch upload multiple files", "batch"),
+                '4': ("Create project from template", "template"),
+                '5': ("Create GitHub release", "release"),
+                '6': ("Update file in multiple repositories", "multi-repo"),
+                '7': ("Scan for TODOs and create issues", "scan-todos"),
+                '8': ("Queue commit for offline", "offline-queue"),
+                '9': ("Process offline commit queue", "process-queue"),
+                '10': ("Request code review", "request-review"),
+                '11': ("Smart push with commit squashing", "smart-push"),
+                '12': ("Generate documentation", "generate-docs"),
+                '13': ("Generate collaboration analytics", "analytics"),
+                '14': ("Run the configuration wizard", "configure"),
+                '15': ("Manage branches", "branch"),
+                '16': ("Manage stashes", "stash"),
+                '17': ("Manage tags", "tag"),
+                '18': ("Cherry-pick a commit", "cherry-pick"),
+                '19': ("Manage Gists", "gist"),
+                '20': ("Manage Webhooks", "webhook"),
+                '21': ("Manage GitHub Actions", "actions"),
+                '22': ("Manage Pull Requests", "pr"),
+                '23': ("Run security audit (Local + GitHub)", "audit"),
+                '24': ("Change repository visibility", "visibility"),
+                '25': ("Get repository info from URL", "repo-info"),
+                '26': ("Delete GitHub repository", "delete-repo"),
+                '27': ("Bulk Repository Management & Health", "bulk-mgmt"),
+                '28': ("Migrate/Mirror Repository from any source", "migrate"),
+                '29': ("Network & Fork Intelligence (OSINT)", "fork-intel"),
+                '0': ("Exit PyGitUp", "exit")
+            }
 
-        display_menu(menu_options)
-        choice = input("\n👉 Enter your choice (1-29): ")
-        
-        selected_option = menu_options.get(choice)
-        mode = selected_option[1] if selected_option else ""
+            display_menu(menu_options)
+            choice = input("\n👉 Enter your choice (0-29): ")
+            
+            if choice == '0':
+                print_info("Goodbye! 🚀")
+                break
 
-    # Execute the corresponding function based on the mode
-    if mode == "project":
-        upload_project_directory(github_username, github_token, config, args)
-    elif mode == "file":
-        upload_single_file(github_username, github_token, config, args)
-    elif mode == "batch":
-        upload_batch_files(github_username, github_token, config, args)
-    elif mode == "template":
-        create_project_from_template(github_username, github_token, config, args)
-    elif mode == "release":
-        create_release_tag(github_username, github_token, config, args)
-    elif mode == "multi-repo":
-        update_multiple_repos(github_username, github_token, config, args)
-    elif mode == "scan-todos":
-        scan_todos(github_username, github_token, config, args)
-    elif mode == "offline-queue":
-        queue_offline_commit(config, args)
-    elif mode == "process-queue":
-        process_offline_queue(github_username, github_token, config, args)
-    elif mode == "request-review":
-        request_code_review(github_username, github_token, config, args)
-    elif mode == "smart-push":
-        smart_push(github_username, github_token, config, args)
-    elif mode == "generate-docs":
-        generate_documentation(github_username, github_token, config, args)
-    elif mode == "analytics":
-        generate_analytics(github_username, github_token, config, args)
-    elif mode == "configure":
-        configuration_wizard()
-    elif mode == "branch":
-        manage_branches(args)
-    elif mode == "stash":
-        manage_stashes(args)
-    elif mode == "tag":
-        manage_tags(args)
-    elif mode == "cherry-pick":
-        cherry_pick_commit(args)
-    elif mode == "gist":
-        manage_gists(args, github_username, github_token)
-    elif mode == "webhook":
-        manage_webhooks(args, github_username, github_token)
-    elif mode == "actions":
-        manage_actions(args, github_username, github_token)
-    elif mode == "pr":
-        manage_pull_requests(args, github_username, github_token)
-    elif mode == "audit":
-        repo_to_audit = args.repo if args and hasattr(args, 'repo') and args.repo else input("Enter repo name for GitHub security scan: ")
-        run_audit(github_username, repo_to_audit, github_token)
-    elif mode == "visibility":
-        manage_repo_visibility(args, github_username, github_token)
-    elif mode == "repo-info":
-        get_detailed_repo_info(args, github_token)
-    elif mode == "delete-repo":
-        delete_repository(args, github_username, github_token)
-    elif mode == "bulk-mgmt":
-        manage_bulk_repositories(github_token)
-    elif mode == "migrate":
-        migrate_repository(github_username, github_token, config, args)
-    elif mode == "fork-intel":
-        url = args.url if args and hasattr(args, 'url') and args.url else input("Enter repository URL: ")
-        owner, repo_name = parse_github_url(url)
-        if owner and repo_name:
-            get_fork_intelligence(owner, repo_name, github_token)
+            selected_option = menu_options.get(choice)
+            mode = selected_option[1] if selected_option else ""
+
+        # Execute the corresponding function based on the mode
+        if mode == "project":
+            upload_project_directory(github_username, github_token, config, args)
+        elif mode == "file":
+            upload_single_file(github_username, github_token, config, args)
+        elif mode == "batch":
+            upload_batch_files(github_username, github_token, config, args)
+        elif mode == "template":
+            create_project_from_template(github_username, github_token, config, args)
+        elif mode == "release":
+            create_release_tag(github_username, github_token, config, args)
+        elif mode == "multi-repo":
+            update_multiple_repos(github_username, github_token, config, args)
+        elif mode == "scan-todos":
+            scan_todos(github_username, github_token, config, args)
+        elif mode == "offline-queue":
+            queue_offline_commit(config, args)
+        elif mode == "process-queue":
+            process_offline_queue(github_username, github_token, config, args)
+        elif mode == "request-review":
+            request_code_review(github_username, github_token, config, args)
+        elif mode == "smart-push":
+            smart_push(github_username, github_token, config, args)
+        elif mode == "generate-docs":
+            generate_documentation(github_username, github_token, config, args)
+        elif mode == "analytics":
+            generate_analytics(github_username, github_token, config, args)
+        elif mode == "configure":
+            configuration_wizard()
+            # Reload config after wizard
+            config = load_config(args.config)
+            github_username = get_github_username(config)
+            github_token = get_github_token(config)
+        elif mode == "branch":
+            manage_branches(args)
+        elif mode == "stash":
+            manage_stashes(args)
+        elif mode == "tag":
+            manage_tags(args)
+        elif mode == "cherry-pick":
+            cherry_pick_commit(args)
+        elif mode == "gist":
+            manage_gists(args, github_username, github_token)
+        elif mode == "webhook":
+            manage_webhooks(args, github_username, github_token)
+        elif mode == "actions":
+            manage_actions(args, github_username, github_token)
+        elif mode == "pr":
+            manage_pull_requests(args, github_username, github_token)
+        elif mode == "audit":
+            repo_to_audit = args.repo if args and hasattr(args, 'repo') and args.repo else input("Enter repo name for GitHub security scan: ")
+            run_audit(github_username, repo_to_audit, github_token)
+        elif mode == "visibility":
+            manage_repo_visibility(args, github_username, github_token)
+        elif mode == "repo-info":
+            get_detailed_repo_info(args, github_token)
+        elif mode == "delete-repo":
+            delete_repository(args, github_username, github_token)
+        elif mode == "bulk-mgmt":
+            manage_bulk_repositories(github_token)
+        elif mode == "migrate":
+            migrate_repository(github_username, github_token, config, args)
+        elif mode == "fork-intel":
+            url = args.url if args and hasattr(args, 'url') and args.url else input("Enter repository URL: ")
+            owner, repo_name = parse_github_url(url)
+            if owner and repo_name:
+                get_fork_intelligence(owner, repo_name, github_token)
+            else:
+                print_error("Invalid repository URL.")
         else:
-            print_error("Invalid repository URL.")
-    else:
-        print_error("Invalid mode selected. Exiting.")
-        sys.exit(1)
+            print_error("Invalid mode selected.")
+            if not is_interactive: sys.exit(1)
 
-    print_success("Operation complete.")
+        print_success("Operation complete.")
+        
+        # If we were in CLI mode, exit loop after one operation
+        if not is_interactive:
+            break
+        
+        input("\n⌨️  Press Enter to return to the menu...")
+        # Clear screen for next iteration
+        import os
+        os.system('cls' if os.name == 'nt' else 'clear')
+        show_banner()
