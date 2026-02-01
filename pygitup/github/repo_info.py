@@ -27,19 +27,30 @@ def get_fork_intelligence(owner, repo, token):
             f_name = fork['name']
             f_default_branch = fork['default_branch']
             
+            print(f"  🔍 Checking @{f_owner}/{f_name} [{f_default_branch}]...")
+            
             # Compare the fork's default branch against the upstream's default branch
-            # Logic: HEAD is the fork, BASE is the upstream
-            compare_resp = github_request("GET", 
-                f"https://api.github.com/repos/{f_owner}/{f_name}/compare/{owner}:{f_default_branch}...{f_default_branch}", 
-                token)
+            compare_url = f"https://api.github.com/repos/{owner}/{repo}/compare/{owner}:{f_default_branch}...{f_owner}:{f_default_branch}"
+            compare_resp = github_request("GET", compare_url, token)
             
             if compare_resp.status_code == 200:
                 data = compare_resp.json()
-                ahead_by = data.get('ahead_by', 0)
-                if ahead_by > 0:
+                ahead = data.get('ahead_by', 0)
+                behind = data.get('behind_by', 0)
+                
+                status = "Synced"
+                if ahead > 0 and behind > 0: status = "Diverged"
+                elif ahead > 0: status = "Ahead"
+                elif behind > 0: status = "Behind"
+                
+                print(f"     └─ Status: {status} | Ahead: {ahead} | Behind: {behind}")
+                
+                if ahead > 0:
                     found_unique = True
-                    print_success(f"🔍 Discovery: @{f_owner} is AHEAD by {ahead_by} commits!")
-                    print(f"   Link: {fork['html_url']}/compare/{owner}:{f_default_branch}...{f_default_branch}")
+                    print_success(f"     🌟 Discovery: Unique code found in @{f_owner}!")
+                    print(f"        View Diff: {data.get('html_url')}")
+            else:
+                print_warning(f"     ⚠️  Could not compare: {compare_resp.status_code}")
         
         if not found_unique:
             print_info("No unique community work detected in forks (all forks are in-sync or behind).")
