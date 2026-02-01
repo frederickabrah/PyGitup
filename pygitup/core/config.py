@@ -12,7 +12,9 @@ DEFAULT_CONFIG = {
     },
     "github": {
         "username": "",
+        "token": "",
         "token_file": "",
+        "ai_api_key": "",
         "default_description": "Repository created with PyGitUp",
         "default_private": False
     },
@@ -115,7 +117,9 @@ def configuration_wizard():
     # We save the token directly in the yaml now for the "Set and Forget" experience
     token = getpass.getpass("GitHub Token (Hidden): ")
     config["github"]["token"] = token 
-
+    
+    ai_key = getpass.getpass("Gemini API Key (Hidden): ")
+    config["github"]["ai_api_key"] = ai_key
     try:
         # Secure the file permissions (Owner Read/Write only)
         with open(config_path, "w") as f:

@@ -2,6 +2,7 @@ import inquirer
 from urllib.parse import urlparse
 from .api import get_repo_info, github_request, get_commit_history, get_issues, get_contributors, get_repo_languages, get_community_profile, get_latest_release, get_repo_forks, compare_commits
 from ..utils.ui import display_repo_info, display_traffic_trends, print_error, print_warning, print_info, print_header, print_success
+from ..utils.scraper import scrape_repo_info
 
 def get_fork_intelligence(owner, repo, token):
     """Deep scan of the Forks Network to find hidden community improvements."""

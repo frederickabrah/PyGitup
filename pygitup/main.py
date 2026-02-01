@@ -11,6 +11,7 @@ from .github.pull_requests import manage_pull_requests, request_code_review
 from .git.push import smart_push
 from .project.docs import generate_documentation
 from .utils.analytics import generate_analytics
+from .utils.ai import ai_commit_workflow
 from .git.branch import manage_branches
 from .git.stash import manage_stashes
 from .git.tag import manage_tags
@@ -89,6 +90,7 @@ def main():
                 '27': ("Bulk Repository Management & Health", "bulk-mgmt"),
                 '28': ("Migrate/Mirror Repository from any source", "migrate"),
                 '29': ("Network & Fork Intelligence (OSINT)", "fork-intel"),
+                '30': ("AI-Powered Semantic Commit", "ai-commit"),
                 '0': ("Exit PyGitUp", "exit")
             }
 
@@ -171,6 +173,8 @@ def main():
                 get_fork_intelligence(owner, repo_name, github_token)
             else:
                 print_error("Invalid repository URL.")
+        elif mode == "ai-commit":
+            ai_commit_workflow(github_username, github_token, config)
         else:
             print_error("Invalid mode selected.")
             if not is_interactive: sys.exit(1)
