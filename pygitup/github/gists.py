@@ -21,6 +21,9 @@ def manage_gists(args, github_username, github_token):
             )
         ]
         answers = inquirer.prompt(questions)
+        if not answers:
+            print_info("Operation cancelled.")
+            return
         action = answers["action"]
 
         if action == "create":
@@ -31,6 +34,9 @@ def manage_gists(args, github_username, github_token):
                 inquirer.Confirm("public", message="Make the Gist public?", default=False),
             ]
             gist_answers = inquirer.prompt(gist_questions)
+            if not gist_answers:
+                print_info("Operation cancelled.")
+                return
             filename = gist_answers["filename"]
             content = gist_answers["content"]
             description = gist_answers["description"]

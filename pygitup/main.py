@@ -28,201 +28,213 @@ from .utils.update import check_for_updates
 
 def main():
     """Main function to orchestrate the process."""
-    show_banner()
-    check_for_updates()
+    try:
+        show_banner()
+        check_for_updates()
 
-    # Parse command line arguments
-    parser = create_parser()
-    args = parser.parse_args()
-    
-    # Load configuration
-    config = load_config(args.config)
-    
-    # Auto-Setup Wizard if credentials missing
-    if not config["github"].get("username") or not config["github"].get("token"):
-        print_info("No existing credentials found. Starting stealth setup...")
-        configuration_wizard()
-        # Reload after setup
+        # Parse command line arguments
+        parser = create_parser()
+        args = parser.parse_args()
+        
+        # Load configuration
         config = load_config(args.config)
-
-    # Get credentials
-    github_username = get_github_username(config)
-    github_token = get_github_token(config)
-    
-    # Process offline queue if not in queue processing mode
-    if args.mode != "process-queue":
-        process_offline_queue(github_username, github_token, config)
-    
-    # Persistent loop for interactive mode
-    is_interactive = not args.mode
-    
-    while True:
-        # Determine mode
-        mode = args.mode
-        if not mode:
-            menu_options = {
-                '1': ("Upload/update a whole project directory", "project"),
-                '2': ("Upload/update a single file", "file"),
-                '3': ("Batch upload multiple files", "batch"),
-                '4': ("Create project from template", "template"),
-                '5': ("Create GitHub release", "release"),
-                '6': ("Update file in multiple repositories", "multi-repo"),
-                '7': ("Scan for TODOs and create issues", "scan-todos"),
-                '8': ("Queue commit for offline", "offline-queue"),
-                '9': ("Process offline commit queue", "process-queue"),
-                '10': ("Request code review", "request-review"),
-                '11': ("Smart push with commit squashing", "smart-push"),
-                '12': ("Generate documentation", "generate-docs"),
-                '13': ("Generate collaboration analytics", "analytics"),
-                '14': ("Run the configuration wizard", "configure"),
-                '15': ("Manage branches", "branch"),
-                '16': ("Manage stashes", "stash"),
-                '17': ("Manage tags", "tag"),
-                '18': ("Cherry-pick a commit", "cherry-pick"),
-                '19': ("Manage Gists", "gist"),
-                '20': ("Manage Webhooks", "webhook"),
-                '21': ("Manage GitHub Actions", "actions"),
-                '22': ("Manage Pull Requests", "pr"),
-                '23': ("Run security audit (Local + GitHub)", "audit"),
-                '24': ("Change repository visibility", "visibility"),
-                '25': ("Get repository info from URL", "repo-info"),
-                '26': ("Delete GitHub repository", "delete-repo"),
-                '27': ("Bulk Repository Management & Health", "bulk-mgmt"),
-                '28': ("Migrate/Mirror Repository from any source", "migrate"),
-                '29': ("Network & Fork Intelligence (OSINT)", "fork-intel"),
-                '30': ("AI-Powered Semantic Commit", "ai-commit"),
-                '31': ("Manage Accounts (Switch/Add/List)", "accounts"),
-                '0': ("Exit PyGitUp", "exit")
-            }
-
-            display_menu(menu_options)
-            max_choice = max([int(k) for k in menu_options.keys() if k.isdigit()])
-            choice = input(f"\n👉 Enter your choice (0-{max_choice}): ")
-            
-            if choice == '0':
-                print_info("Goodbye! 🚀")
-                break
-
-            selected_option = menu_options.get(choice)
-            mode = selected_option[1] if selected_option else ""
-
-        # Execute the corresponding function based on the mode
-        if mode == "project":
-            upload_project_directory(github_username, github_token, config, args)
-        elif mode == "file":
-            upload_single_file(github_username, github_token, config, args)
-        elif mode == "batch":
-            upload_batch_files(github_username, github_token, config, args)
-        elif mode == "template":
-            create_project_from_template(github_username, github_token, config, args)
-        elif mode == "release":
-            create_release_tag(github_username, github_token, config, args)
-        elif mode == "multi-repo":
-            update_multiple_repos(github_username, github_token, config, args)
-        elif mode == "scan-todos":
-            scan_todos(github_username, github_token, config, args)
-        elif mode == "offline-queue":
-            queue_offline_commit(config, args)
-        elif mode == "process-queue":
-            process_offline_queue(github_username, github_token, config, args)
-        elif mode == "request-review":
-            request_code_review(github_username, github_token, config, args)
-        elif mode == "smart-push":
-            smart_push(github_username, github_token, config, args)
-        elif mode == "generate-docs":
-            generate_documentation(github_username, github_token, config, args)
-        elif mode == "analytics":
-            generate_analytics(github_username, github_token, config, args)
-        elif mode == "configure":
+        
+        # Auto-Setup Wizard if credentials missing
+        if not config["github"].get("username") or not config["github"].get("token"):
+            print_info("No existing credentials found. Starting stealth setup...")
             configuration_wizard()
-            # Reload config after wizard
+            # Reload after setup
             config = load_config(args.config)
-            github_username = get_github_username(config)
-            github_token = get_github_token(config)
-        elif mode == "branch":
-            manage_branches(args)
-        elif mode == "stash":
-            manage_stashes(args)
-        elif mode == "tag":
-            manage_tags(args)
-        elif mode == "cherry-pick":
-            cherry_pick_commit(args)
-        elif mode == "gist":
-            manage_gists(args, github_username, github_token)
-        elif mode == "webhook":
-            manage_webhooks(args, github_username, github_token)
-        elif mode == "actions":
-            manage_actions(args, github_username, github_token)
-        elif mode == "pr":
-            manage_pull_requests(args, github_username, github_token)
-        elif mode == "audit":
-            repo_to_audit = args.repo if args and hasattr(args, 'repo') and args.repo else input("Enter repo name for GitHub security scan: ")
-            run_audit(github_username, repo_to_audit, github_token)
-        elif mode == "visibility":
-            manage_repo_visibility(args, github_username, github_token)
-        elif mode == "repo-info":
-            get_detailed_repo_info(args, github_token)
-        elif mode == "delete-repo":
-            delete_repository(args, github_username, github_token)
-        elif mode == "bulk-mgmt":
-            manage_bulk_repositories(github_token)
-        elif mode == "migrate":
-            migrate_repository(github_username, github_token, config, args)
-        elif mode == "fork-intel":
-            url = args.url if args and hasattr(args, 'url') and args.url else input("Enter repository URL: ")
-            owner, repo_name = parse_github_url(url)
-            if owner and repo_name:
-                get_fork_intelligence(owner, repo_name, github_token)
-            else:
-                print_error("Invalid repository URL.")
-        elif mode == "ai-commit":
-            ai_commit_workflow(github_username, github_token, config)
-        elif mode == "accounts":
-            print_header("Account & Profile Manager")
-            profiles = list_profiles()
-            active_path = get_active_profile_path()
-            active_name = os.path.basename(active_path).replace(".yaml", "")
 
-            print_info(f"Current Active Profile: [bold green]{active_name}[/bold green]")
-            print("\nAvailable Profiles:")
-            for p in profiles:
-                marker = "➜ " if p == active_name else "  "
-                print(f"{marker}{p}")
-            
-            print("\n[bold]Options:[/bold]")
-            print("1: Switch Profile")
-            print("2: Add New Account")
-            print("3: Back")
-            
-            acc_choice = input("\n👉 Choice: ")
-            if acc_choice == '1':
-                target = input("Enter profile name to switch to: ")
-                success, msg = set_active_profile(target)
-                if success:
-                    print_success(msg)
-                    # Reload everything
-                    config = load_config(args.config)
-                    github_username = get_github_username(config)
-                    github_token = get_github_token(config)
-                else:
-                    print_error(msg)
-            elif acc_choice == '2':
+        # Get credentials
+        github_username = get_github_username(config)
+        github_token = get_github_token(config)
+        
+        # Process offline queue if not in queue processing mode
+        if args.mode != "process-queue":
+            process_offline_queue(github_username, github_token, config)
+        
+        # Persistent loop for interactive mode
+        is_interactive = not args.mode
+        
+        while True:
+            # Determine mode
+            mode = args.mode
+            if not mode:
+                menu_options = {
+                    '1': ("Upload/update a whole project directory", "project"),
+                    '2': ("Upload/update a single file", "file"),
+                    '3': ("Batch upload multiple files", "batch"),
+                    '4': ("Create project from template", "template"),
+                    '5': ("Create GitHub release", "release"),
+                    '6': ("Update file in multiple repositories", "multi-repo"),
+                    '7': ("Scan for TODOs and create issues", "scan-todos"),
+                    '8': ("Queue commit for offline", "offline-queue"),
+                    '9': ("Process offline commit queue", "process-queue"),
+                    '10': ("Request code review", "request-review"),
+                    '11': ("Smart push with commit squashing", "smart-push"),
+                    '12': ("Generate documentation", "generate-docs"),
+                    '13': ("Generate collaboration analytics", "analytics"),
+                    '14': ("Run the configuration wizard", "configure"),
+                    '15': ("Manage branches", "branch"),
+                    '16': ("Manage stashes", "stash"),
+                    '17': ("Manage tags", "tag"),
+                    '18': ("Cherry-pick a commit", "cherry-pick"),
+                    '19': ("Manage Gists", "gist"),
+                    '20': ("Manage Webhooks", "webhook"),
+                    '21': ("Manage GitHub Actions", "actions"),
+                    '22': ("Manage Pull Requests", "pr"),
+                    '23': ("Run security audit (Local + GitHub)", "audit"),
+                    '24': ("Change repository visibility", "visibility"),
+                    '25': ("Get repository info from URL", "repo-info"),
+                    '26': ("Delete GitHub repository", "delete-repo"),
+                    '27': ("Bulk Repository Management & Health", "bulk-mgmt"),
+                    '28': ("Migrate/Mirror Repository from any source", "migrate"),
+                    '29': ("Network & Fork Intelligence (OSINT)", "fork-intel"),
+                    '30': ("AI-Powered Semantic Commit", "ai-commit"),
+                    '31': ("Manage Accounts (Switch/Add/List)", "accounts"),
+                    '0': ("Exit PyGitUp", "exit")
+                }
+
+                display_menu(menu_options)
+                max_choice = max([int(k) for k in menu_options.keys() if k.isdigit()])
+                choice = input(f"\n👉 Enter your choice (0-{max_choice}): ")
+                
+                if choice == '0':
+                    print_info("Goodbye! 🚀")
+                    break
+
+                selected_option = menu_options.get(choice)
+                if not selected_option:
+                    print_error("Invalid choice. Try again.")
+                    continue
+                mode = selected_option[1]
+
+            # Execute the corresponding function based on the mode
+            if mode == "project":
+                upload_project_directory(github_username, github_token, config, args)
+            elif mode == "file":
+                upload_single_file(github_username, github_token, config, args)
+            elif mode == "batch":
+                upload_batch_files(github_username, github_token, config, args)
+            elif mode == "template":
+                create_project_from_template(github_username, github_token, config, args)
+            elif mode == "release":
+                create_release_tag(github_username, github_token, config, args)
+            elif mode == "multi-repo":
+                update_multiple_repos(github_username, github_token, config, args)
+            elif mode == "scan-todos":
+                scan_todos(github_username, github_token, config, args)
+            elif mode == "offline-queue":
+                queue_offline_commit(config, args)
+            elif mode == "process-queue":
+                process_offline_queue(github_username, github_token, config, args)
+            elif mode == "request-review":
+                request_code_review(github_username, github_token, config, args)
+            elif mode == "smart-push":
+                smart_push(github_username, github_token, config, args)
+            elif mode == "generate-docs":
+                generate_documentation(github_username, github_token, config, args)
+            elif mode == "analytics":
+                generate_analytics(github_username, github_token, config, args)
+            elif mode == "configure":
                 configuration_wizard()
+                # Reload config after wizard
                 config = load_config(args.config)
                 github_username = get_github_username(config)
                 github_token = get_github_token(config)
-        else:
-            print_error("Invalid mode selected.")
-            if not is_interactive: sys.exit(1)
+            elif mode == "branch":
+                manage_branches(args)
+            elif mode == "stash":
+                manage_stashes(args)
+            elif mode == "tag":
+                manage_tags(args)
+            elif mode == "cherry-pick":
+                cherry_pick_commit(args)
+            elif mode == "gist":
+                manage_gists(args, github_username, github_token)
+            elif mode == "webhook":
+                manage_webhooks(args, github_username, github_token)
+            elif mode == "actions":
+                manage_actions(args, github_username, github_token)
+            elif mode == "pr":
+                manage_pull_requests(args, github_username, github_token)
+            elif mode == "audit":
+                repo_to_audit = args.repo if args and hasattr(args, 'repo') and args.repo else input("Enter repo name for GitHub security scan: ")
+                run_audit(github_username, repo_to_audit, github_token)
+            elif mode == "visibility":
+                manage_repo_visibility(args, github_username, github_token)
+            elif mode == "repo-info":
+                get_detailed_repo_info(args, github_token)
+            elif mode == "delete-repo":
+                delete_repository(args, github_username, github_token)
+            elif mode == "bulk-mgmt":
+                manage_bulk_repositories(github_token)
+            elif mode == "migrate":
+                migrate_repository(github_username, github_token, config, args)
+            elif mode == "fork-intel":
+                url = args.url if args and hasattr(args, 'url') and args.url else input("Enter repository URL: ")
+                owner, repo_name = parse_github_url(url)
+                if owner and repo_name:
+                    get_fork_intelligence(owner, repo_name, github_token)
+                else:
+                    print_error("Invalid repository URL.")
+            elif mode == "ai-commit":
+                ai_commit_workflow(github_username, github_token, config)
+            elif mode == "accounts":
+                print_header("Account & Profile Manager")
+                profiles = list_profiles()
+                active_path = get_active_profile_path()
+                active_name = os.path.basename(active_path).replace(".yaml", "")
 
-        print_success("Operation complete.")
-        
-        # If we were in CLI mode, exit loop after one operation
-        if not is_interactive:
-            break
-        
-        input("\n⌨️  Press Enter to return to the menu...")
-        # Clear screen for next iteration
-        import os
-        os.system('cls' if os.name == 'nt' else 'clear')
-        show_banner()
+                print_info(f"Current Active Profile: [bold green]{active_name}[/bold green]")
+                print("\nAvailable Profiles:")
+                for p in profiles:
+                    marker = "➜ " if p == active_name else "  "
+                    print(f"{marker}{p}")
+                
+                print("\n[bold]Options:[/bold]")
+                print("1: Switch Profile")
+                print("2: Add New Account")
+                print("3: Back")
+                
+                acc_choice = input("\n👉 Choice: ")
+                if acc_choice == '1':
+                    target = input("Enter profile name to switch to: ")
+                    success, msg = set_active_profile(target)
+                    if success:
+                        print_success(msg)
+                        # Reload everything
+                        config = load_config(args.config)
+                        github_username = get_github_username(config)
+                        github_token = get_github_token(config)
+                    else:
+                        print_error(msg)
+                elif acc_choice == '2':
+                    configuration_wizard()
+                    config = load_config(args.config)
+                    github_username = get_github_username(config)
+                    github_token = get_github_token(config)
+            else:
+                print_error("Invalid mode selected.")
+                if not is_interactive: sys.exit(1)
+
+            print_success("Operation complete.")
+            
+            # If we were in CLI mode, exit loop after one operation
+            if not is_interactive:
+                break
+            
+            input("\n⌨️  Press Enter to return to the menu...")
+            # Clear screen for next iteration
+            import os
+            os.system('cls' if os.name == 'nt' else 'clear')
+            show_banner()
+    except KeyboardInterrupt:
+        print("\n")
+        print_info("PyGitUp interrupted by user. Exiting...")
+        sys.exit(0)
+    except Exception as e:
+        print_error(f"A critical error occurred: {e}")
+        print_info("Please report this bug at: https://github.com/frederickabrah/PyGitup/issues")
+        sys.exit(1)
