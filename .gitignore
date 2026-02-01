@@ -45,6 +45,9 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+.care/
+care-report.md
+*.json
 pytestdebug.log
 
 # Translations
