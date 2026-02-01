@@ -132,6 +132,16 @@ def get_issues(username, repo_name, token, state="all"):
     params = {"state": state}
     return github_request("GET", url, token, params=params)
 
+def get_repo_forks(owner, repo, token):
+    """Fetch all forks of a repository."""
+    url = f"https://api.github.com/repos/{owner}/{repo}/forks"
+    return github_request("GET", url, token, params={"per_page": 100})
+
+def compare_commits(owner, repo, base, head, token):
+    """Compare two commits/branches/refs."""
+    url = f"https://api.github.com/repos/{owner}/{repo}/compare/{base}...{head}"
+    return github_request("GET", url, token)
+
 def get_repo_languages(username, repo_name, token):
     """Get detailed language breakdown for a repository."""
     url = f"https://api.github.com/repos/{username}/{repo_name}/languages"

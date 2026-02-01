@@ -2,7 +2,7 @@ import sys
 
 from .core.args import create_parser
 from .core.config import load_config, get_github_username, get_github_token, configuration_wizard
-from .project.project_ops import upload_project_directory, upload_single_file, upload_batch_files, update_multiple_repos, manage_bulk_repositories
+from .project.project_ops import upload_project_directory, upload_single_file, upload_batch_files, update_multiple_repos, manage_bulk_repositories, migrate_repository
 from .project.templates import create_project_from_template
 from .github.releases import create_release_tag
 from .project.issues import scan_todos
@@ -20,7 +20,7 @@ from .github.webhooks import manage_webhooks
 from .github.actions import manage_actions
 from .utils.security import run_audit
 from .github.repo import manage_repo_visibility, delete_repository
-from .github.repo_info import get_detailed_repo_info
+from .github.repo_info import get_detailed_repo_info, get_fork_intelligence
 from .utils.banner import show_banner
 from .utils.ui import display_menu, print_error, print_success, print_info
 from .utils.update import check_for_updates
@@ -82,11 +82,13 @@ def main():
             '24': ("Change repository visibility", "visibility"),
             '25': ("Get repository info from URL", "repo-info"),
             '26': ("Delete GitHub repository", "delete-repo"),
-            '27': ("Bulk Repository Management & Health", "bulk-mgmt")
+            '27': ("Bulk Repository Management & Health", "bulk-mgmt"),
+            '28': ("Migrate/Mirror Repository from any source", "migrate"),
+            '29': ("Network & Fork Intelligence (OSINT)", "fork-intel")
         }
 
         display_menu(menu_options)
-        choice = input("\n👉 Enter your choice (1-27): ")
+        choice = input("\n👉 Enter your choice (1-29): ")
         
         selected_option = menu_options.get(choice)
         mode = selected_option[1] if selected_option else ""
@@ -147,6 +149,15 @@ def main():
         delete_repository(args, github_username, github_token)
     elif mode == "bulk-mgmt":
         manage_bulk_repositories(github_token)
+    elif mode == "migrate":
+        migrate_repository(github_username, github_token, config, args)
+    elif mode == "fork-intel":
+        url = args.url if args and hasattr(args, 'url') and args.url else input("Enter repository URL: ")
+        owner, repo_name = parse_github_url(url)
+        if owner and repo_name:
+            get_fork_intelligence(owner, repo_name, github_token)
+        else:
+            print_error("Invalid repository URL.")
     else:
         print_error("Invalid mode selected. Exiting.")
         sys.exit(1)
