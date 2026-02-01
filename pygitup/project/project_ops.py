@@ -345,7 +345,7 @@ def upload_batch_files(github_username, github_token, config, args=None):
     for local_file in file_iterator:
         try:
             if repo_base_path:
-                repo_file_path = os.path.join(repo_base_path, os.path.basename(local_file)).replace("\", "/")
+                repo_file_path = os.path.join(repo_base_path, os.path.basename(local_file)).replace("\\", "/")
             else:
                 repo_file_path = os.path.basename(local_file)
             

@@ -132,6 +132,22 @@ def get_issues(username, repo_name, token, state="all"):
     params = {"state": state}
     return github_request("GET", url, token, params=params)
 
+def get_repo_languages(username, repo_name, token):
+    """Get detailed language breakdown for a repository."""
+    url = f"https://api.github.com/repos/{username}/{repo_name}/languages"
+    return github_request("GET", url, token)
+
+def get_community_profile(username, repo_name, token):
+    """Get community health metrics (presence of README, LICENSE, etc)."""
+    url = f"https://api.github.com/repos/{username}/{repo_name}/community/profile"
+    # This endpoint uses a different preview header for some data
+    return github_request("GET", url, token)
+
+def get_latest_release(username, repo_name, token):
+    """Get the latest release for a repository."""
+    url = f"https://api.github.com/repos/{username}/{repo_name}/releases/latest"
+    return github_request("GET", url, token)
+
 def get_repo_contents(username, repo_name, token, path=""):
     """Get repository contents recursively."""
     url = f"https://api.github.com/repos/{username}/{repo_name}/contents/{path}"
