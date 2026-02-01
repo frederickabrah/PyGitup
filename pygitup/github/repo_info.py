@@ -157,6 +157,18 @@ def get_detailed_repo_info(args, github_token):
 
         repo_data = repo_response.json()
 
+        # Hybrid Intelligence: Scrape data that API hides
+        try:
+            full_url = f"https://github.com/{owner}/{repo_name}"
+            scraped_intel = scrape_repo_info(full_url)
+            if scraped_intel:
+                repo_data['used_by'] = scraped_intel.get('used_by')
+                repo_data['is_sponsored'] = scraped_intel.get('is_sponsored')
+                repo_data['topics'] = scraped_intel.get('topics', [])
+                repo_data['social_preview'] = scraped_intel.get('social_preview')
+        except Exception:
+            pass
+
         # OSINT Upgrade: Fetch deep metadata
         try:
             # Languages
