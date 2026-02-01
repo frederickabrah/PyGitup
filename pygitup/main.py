@@ -23,10 +23,12 @@ from .github.repo import manage_repo_visibility, delete_repository
 from .github.repo_info import get_detailed_repo_info
 from .utils.banner import show_banner
 from .utils.ui import display_menu, print_error, print_success
+from .utils.update import check_for_updates
 
 def main():
     """Main function to orchestrate the process."""
     show_banner()
+    check_for_updates()
 
     # Parse command line arguments
     parser = create_parser()
