@@ -14,32 +14,38 @@ def get_git_diff():
         return None
 
 def call_gemini_api(api_key, prompt, timeout=30):
-    """Centralized caller with 2.0 Flash -> 1.5 Flash fallback logic."""
+    """Centralized caller with 2.0 Flash -> 1.5 Flash fallback and verbose debugging."""
     if not api_key:
         print_error("Gemini API Key missing. Run Option 14.")
         return None
 
-    # Models to try in order
+    # Models and Versions to try
     models = ["gemini-2.0-flash", "gemini-1.5-flash"]
+    api_versions = ["v1beta", "v1"]
     
     last_error = ""
     for model in models:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-        payload = {"contents": [{"parts": [{"text": prompt}]}]}
-        
-        try:
-            response = requests.post(url, json=payload, timeout=timeout)
-            if response.status_code == 200:
-                data = response.json()
-                return data['candidates'][0]['content']['parts'][0]['text'].strip()
-            else:
-                last_error = f"Model {model} failed: {response.status_code} - {response.text}"
-                continue # Try next model
-        except Exception as e:
-            last_error = f"Connection to {model} failed: {e}"
-            continue
+        for version in api_versions:
+            url = f"https://generativelanguage.googleapis.com/{version}/models/{model}:generateContent?key={api_key}"
+            payload = {"contents": [{"parts": [{"text": prompt}]}]}
+            
+            print_info(f"🤖 Attempting AI Request ({model} @ {version})...")
+            
+            try:
+                response = requests.post(url, json=payload, timeout=timeout)
+                if response.status_code == 200:
+                    data = response.json()
+                    return data['candidates'][0]['content']['parts'][0]['text'].strip()
+                else:
+                    last_error = f"[{model}/{version}] HTTP {response.status_code}: {response.text}"
+                    print_warning(f"   ⚠️  Attempt failed: {version} returned {response.status_code}")
+                    continue 
+            except Exception as e:
+                last_error = f"[{model}/{version}] Connection error: {e}"
+                continue
 
-    print_error(f"AI Engine failure after all attempts. Last error: {last_error}")
+    print_error(f"❌ AI Engine exhausted all fallbacks.")
+    console.print(Panel(last_error, title="Raw Error Response from Google", border_style="red"))
     return None
 
 def generate_ai_commit_message(api_key, diff_text):
