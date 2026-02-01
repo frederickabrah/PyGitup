@@ -1,11 +1,9 @@
-
-import requests
 import inquirer
-
-from .api import get_github_headers
+from .api import github_request
+from ..utils.ui import print_success, print_error, print_info, print_header
 
 def manage_webhooks(args, github_username, github_token):
-    """Handle webhook management operations."""
+    """Handle webhook management operations with rate-limiting support."""
     action = args.action if hasattr(args, 'action') and args.action else None
     repo_name = args.repo if hasattr(args, 'repo') and args.repo else None
     hook_id = args.hook_id if hasattr(args, 'hook_id') and args.hook_id else None
@@ -13,6 +11,7 @@ def manage_webhooks(args, github_username, github_token):
     events = args.events if hasattr(args, 'events') and args.events else ['push']
 
     if not action:
+        print_header("Webhook Management")
         questions = [
             inquirer.List(
                 "action",
@@ -43,23 +42,22 @@ def manage_webhooks(args, github_username, github_token):
             hook_id = hook_id_answers["hook_id"]
 
     if not repo_name:
-        print("Repository name is required for webhook operations.")
+        print_error("Repository name is required for webhook operations.")
         return
 
-    headers = get_github_headers(github_token)
     base_url = f"https://api.github.com/repos/{github_username}/{repo_name}/hooks"
 
     try:
         if action == "list":
-            response = requests.get(base_url, headers=headers)
+            response = github_request("GET", base_url, github_token)
             response.raise_for_status()
             hooks = response.json()
             if hooks:
-                print(f"Webhooks for {repo_name}:")
+                print_info(f"Webhooks for {repo_name}:")
                 for hook in hooks:
                     print(f"- ID: {hook['id']}, URL: {hook['config']['url']}, Events: {hook['events']}")
             else:
-                print(f"No webhooks found for {repo_name}.")
+                print_info(f"No webhooks found for {repo_name}.")
 
         elif action == "create":
             data = {
@@ -71,17 +69,18 @@ def manage_webhooks(args, github_username, github_token):
                     "content_type": "json"
                 }
             }
-            response = requests.post(base_url, headers=headers, json=data)
+            response = github_request("POST", base_url, github_token, json=data)
             response.raise_for_status()
-            print("Webhook created successfully!")
+            print_success("Webhook created successfully!")
 
         elif action == "delete":
+            if not hook_id:
+                print_error("Hook ID is required for deletion.")
+                return
             delete_url = f"{base_url}/{hook_id}"
-            response = requests.delete(delete_url, headers=headers)
+            response = github_request("DELETE", delete_url, github_token)
             response.raise_for_status()
-            print("Webhook deleted successfully!")
+            print_success("Webhook deleted successfully!")
 
-    except requests.exceptions.RequestException as e:
-        print(f"An error occurred while communicating with the GitHub API: {e}")
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print_error(f"Webhook operation failed: {e}")
