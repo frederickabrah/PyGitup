@@ -1,9 +1,11 @@
+
 import os
 import re
 import ast
 import requests
 
 from ..github.api import get_repo_contents
+from ..utils.ui import print_success, print_error, print_info, print_header, print_warning
 
 def extract_python_docs(content, filename):
     """Extract documentation from Python code using AST."""
@@ -52,9 +54,9 @@ def extract_python_docs(content, filename):
                 docs['classes'].append(class_info)
                 
     except SyntaxError:
-        print(f"Warning: Could not parse {filename} (SyntaxError). Skipping.")
+        print_warning(f"Could not parse {filename} (SyntaxError). Skipping.")
     except Exception as e:
-        print(f"Warning: Error parsing {filename}: {e}")
+        print_warning(f"Error parsing {filename}: {e}")
     
     return docs
 
@@ -147,12 +149,13 @@ def extract_java_docs(content, filename):
     return docs
 
 def generate_documentation(github_username, github_token, config, args=None):
-    """Generate documentation from code comments."""
+    """Generate documentation from code comments with styled output."""
     if args and args.dry_run:
-        print("*** Dry Run Mode: No changes will be made. ***")
-        print("Would generate documentation from code comments.")
+        print_info("*** Dry Run Mode: No changes will be made. ***")
+        print_info("Would generate documentation from code comments.")
         return
 
+    print_header("Documentation Generator")
     if args and args.repo:
         repo_name = args.repo
     else:
@@ -165,8 +168,8 @@ def generate_documentation(github_username, github_token, config, args=None):
         output_dir_input = input(f"Enter output directory (default: {output_dir}): ")
         output_dir = output_dir_input if output_dir_input else output_dir
     
-    print(f"Generating documentation for {repo_name}...")
-    print(f"Output directory: {output_dir}")
+    print_info(f"Generating documentation for {repo_name}...")
+    print_info(f"Output directory: {output_dir}")
     
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
@@ -175,7 +178,7 @@ def generate_documentation(github_username, github_token, config, args=None):
     try:
         response = get_repo_contents(github_username, repo_name, github_token)
         if response.status_code != 200:
-            print(f"Error accessing repository: {response.status_code}")
+            print_error(f"Error accessing repository: {response.status_code}")
             return
         
         contents = response.json()
@@ -193,7 +196,6 @@ def generate_documentation(github_username, github_token, config, args=None):
         
         # Process files
         api_reference = "## API Reference\n\n"
-        modules_doc = ""
         examples_doc = "## Usage Examples\n\n"
         
         # Add sections for each language
@@ -207,7 +209,7 @@ def generate_documentation(github_username, github_token, config, args=None):
             if item['type'] == 'file':
                 # Process Python files
                 if item['name'].endswith('.py'):
-                    print(f"Processing {item['name']}...")
+                    print_info(f"Processing {item['name']}...")
                     file_response = requests.get(item['download_url'])
                     if file_response.status_code == 200:
                         content = file_response.text
@@ -242,7 +244,7 @@ def generate_documentation(github_username, github_token, config, args=None):
                 
                 # Process JavaScript files
                 elif item['name'].endswith(('.js', '.jsx', '.ts', '.tsx')):
-                    print(f"Processing {item['name']}...")
+                    print_info(f"Processing {item['name']}...")
                     file_response = requests.get(item['download_url'])
                     if file_response.status_code == 200:
                         content = file_response.text
@@ -268,7 +270,7 @@ def generate_documentation(github_username, github_token, config, args=None):
                 
                 # Process Java files
                 elif item['name'].endswith('.java'):
-                    print(f"Processing {item['name']}...")
+                    print_info(f"Processing {item['name']}...")
                     file_response = requests.get(item['download_url'])
                     if file_response.status_code == 200:
                         content = file_response.text
@@ -287,7 +289,7 @@ def generate_documentation(github_username, github_token, config, args=None):
                 
                 # Process C++ files
                 elif item['name'].endswith(('.cpp', '.hpp', '.h')):
-                    print(f"Processing {item['name']}...")
+                    print_info(f"Processing {item['name']}...")
                     file_response = requests.get(item['download_url'])
                     if file_response.status_code == 200:
                         content = file_response.text
@@ -313,7 +315,7 @@ def generate_documentation(github_username, github_token, config, args=None):
                 
                 # Process Go files
                 elif item['name'].endswith('.go'):
-                    print(f"Processing {item['name']}...")
+                    print_info(f"Processing {item['name']}...")
                     file_response = requests.get(item['download_url'])
                     if file_response.status_code == 200:
                         content = file_response.text
@@ -349,13 +351,13 @@ def generate_documentation(github_username, github_token, config, args=None):
         doc_path = os.path.join(output_dir, "README.md")
         with open(doc_path, 'w') as f:
             f.write(doc_content)
-        print(f"Main documentation generated successfully at {doc_path}")
+        print_success(f"Main documentation generated successfully at {doc_path}")
         
         # Create API reference file
         api_path = os.path.join(output_dir, "API_REFERENCE.md")
         with open(api_path, 'w') as f:
             f.write(api_reference)
-        print(f"API reference generated successfully at {api_path}")
+        print_success(f"API reference generated successfully at {api_path}")
         
         # Create simple index
         index_content = f"# {repo_name} Documentation\n\n"
@@ -365,10 +367,10 @@ def generate_documentation(github_username, github_token, config, args=None):
         index_path = os.path.join(output_dir, "index.md")
         with open(index_path, 'w') as f:
             f.write(index_content)
-        print(f"Documentation index generated successfully at {index_path}")
+        print_success(f"Documentation index generated successfully at {index_path}")
         
-        print(f"\nDocumentation generation complete!")
-        print(f"Documentation saved to: {output_dir}")
+        print_success("\nDocumentation generation complete!")
+        print_info(f"Documentation saved to: {output_dir}")
         
     except Exception as e:
-        print(f"Error generating documentation: {e}")
+        print_error(f"Error generating documentation: {e}")

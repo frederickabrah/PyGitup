@@ -35,13 +35,11 @@ def github_request(method, url, token, **kwargs):
             raise
 
 def graphql_request(query, variables, token):
-    """Execute a GitHub GraphQL (v4) API request."""
+    """Execute a GitHub GraphQL (v4) API request with rate-limiting support."""
     url = "https://api.github.com/graphql"
-    headers = {"Authorization": f"bearer {token}"}
     payload = {"query": query, "variables": variables}
     # GraphQL always uses POST
-    response = requests.post(url, json=payload, headers=headers)
-    return response
+    return github_request("POST", url, token, json=payload)
 
 def get_repo_info(username, repo_name, token):
     """Get repository information."""

@@ -1,11 +1,11 @@
-
 import subprocess
+from ..utils.ui import print_success, print_error, print_info, print_header, print_warning
 
 def smart_push(github_username, github_token, config, args=None):
-    """Smart push that squashes meaningless commits."""
+    """Smart push that squashes meaningless commits with styled output."""
     if args and args.dry_run:
-        print("*** Dry Run Mode: No changes will be made. ***")
-        print("Would perform a smart push with commit squashing.")
+        print_info("*** Dry Run Mode: No changes will be made. ***")
+        print_info("Would perform a smart push with commit squashing.")
         return
 
     if args and args.repo:
@@ -20,7 +20,7 @@ def smart_push(github_username, github_token, config, args=None):
         patterns_input = input("Enter commit message patterns to squash (comma-separated): ")
         patterns = patterns_input.split(",") if patterns_input else ["typo", "fix", "update"]
 
-    print(f"Smart pushing to {repo_name} with squash patterns: {patterns}")
+    print_info(f"Smart pushing to {repo_name} with squash patterns: {patterns}")
 
     try:
         # Get the last 10 commits
@@ -30,18 +30,21 @@ def smart_push(github_username, github_token, config, args=None):
         # Identify commits to squash
         commits_to_squash = []
         for commit in commits:
-            commit_hash, commit_message = commit.split(" ", 1)
+            parts = commit.split(" ", 1)
+            if len(parts) < 2: continue
+            commit_hash, commit_message = parts
             for pattern in patterns:
                 if pattern.lower() in commit_message.lower():
                     commits_to_squash.append(commit_hash)
                     break
 
         if not commits_to_squash:
-            print("No commits to squash. Pushing normally.")
+            print_info("No commits to squash. Pushing normally.")
             subprocess.run(["git", "push"], check=True)
+            print_success("Pushed to GitHub.")
             return
 
-        print(f"Found {len(commits_to_squash)} commits to squash: {commits_to_squash}")
+        print_info(f"Found {len(commits_to_squash)} commits to squash: {commits_to_squash}")
 
         # The parent of the oldest commit to be squashed
         squash_base = f"{commits_to_squash[-1]}~"
@@ -54,18 +57,18 @@ def smart_push(github_username, github_token, config, args=None):
 
         new_commit_message = f"Squashed {len(squashed_messages)} commits\n\n" + "\n".join(f"- {msg}" for msg in squashed_messages)
 
-        print(f"\nResetting to {squash_base} and preparing to squash.")
+        print_info(f"Resetting to {squash_base} and preparing to squash.")
         subprocess.run(["git", "reset", "--soft", squash_base], check=True)
 
-        print("Creating new squashed commit.")
+        print_info("Creating new squashed commit.")
         subprocess.run(["git", "commit", "-m", new_commit_message], check=True)
 
-        print("Force-pushing the new history. This will overwrite the remote history.")
+        print_warning("Force-pushing the new history. This will overwrite the remote history.")
         subprocess.run(["git", "push", "--force-with-lease"], check=True)
 
-        print("\nSmart push complete.")
+        print_success("Smart push complete.")
 
     except subprocess.CalledProcessError as e:
-        print(f"An error occurred while running a git command: {e}")
+        print_error(f"Git command failed: {e}")
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print_error(f"An unexpected error occurred: {e}")

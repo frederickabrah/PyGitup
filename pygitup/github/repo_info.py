@@ -128,10 +128,7 @@ def get_detailed_repo_info(args, github_token):
 
         # Add health metrics
         health_metrics = get_repo_health_metrics(owner, repo_name, github_token)
-        # Merge health metrics into repo_data for display_repo_info if we modify it to show them, 
-        # or handle separately. For now, let's just make sure display_repo_info can handle what we pass.
-        # Ideally, we update display_repo_info to show health metrics too, but the prompt didn't strictly require it 
-        # in the display function modification provided. I'll focus on the traffic data first.
+        repo_data['health'] = health_metrics
         
         # Display comprehensive report
         display_repo_info(repo_data)

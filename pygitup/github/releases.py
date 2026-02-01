@@ -1,4 +1,5 @@
 from .api import create_release, get_commit_history
+from ..utils.ui import print_success, print_error, print_info, print_header
 
 def get_release_input(config, args, github_username, github_token):
     """Get release input from user or arguments."""
@@ -48,22 +49,23 @@ def generate_changelog(username, repo_name, token, version):
         return f"Changelog generation failed: {e}"
 
 def create_release_tag(github_username, github_token, config, args=None):
-    """Create a new GitHub release."""
+    """Create a new GitHub release with styled output."""
     if args and args.dry_run:
-        print("*** Dry Run Mode: No changes will be made. ***")
+        print_info("*** Dry Run Mode: No changes will be made. ***")
         repo_name, version, name, changelog = get_release_input(config, args, github_username, github_token)
-        print(f"Would create release {version} for {repo_name}.")
+        print_info(f"Would create release {version} for {repo_name}.")
         return
 
+    print_header("Create GitHub Release")
     repo_name, version, name, changelog = get_release_input(config, args, github_username, github_token)
     
-    print(f"Creating release {version} for {repo_name}...")
+    print_info(f"Creating release {version} for {repo_name}...")
     
     response = create_release(github_username, repo_name, github_token, version, name, changelog)
     
     if response.status_code == 201:
         release_data = response.json()
-        print(f"Release created successfully!")
-        print(f"View release at: {release_data['html_url']}")
+        print_success(f"Release created successfully!")
+        print_info(f"View release at: {release_data['html_url']}")
     else:
-        print(f"Error creating release: {response.status_code} - {response.text}")
+        print_error(f"Error creating release: {response.status_code} - {response.text}")

@@ -1,19 +1,19 @@
-
-import requests
 import inquirer
 import subprocess
 import time
 
-from .api import get_github_headers, create_pull_request
+from .api import github_request, create_pull_request
+from ..utils.ui import print_success, print_error, print_info, print_header
 
 def manage_pull_requests(args, github_username, github_token):
-    """Handle pull request management operations."""
+    """Handle pull request management operations with rate-limiting support."""
     action = args.action if hasattr(args, 'action') and args.action else None
     repo_name = args.repo if hasattr(args, 'repo') and args.repo else None
     pr_number = args.pr_number if hasattr(args, 'pr_number') and args.pr_number else None
     comment = args.comment if hasattr(args, 'comment') and args.comment else None
 
     if not action:
+        print_header("Pull Request Management")
         questions = [
             inquirer.List(
                 "action",
@@ -39,49 +39,46 @@ def manage_pull_requests(args, github_username, github_token):
             comment = comment_answers["comment"]
 
     if not repo_name or not pr_number:
-        print("Repository name and pull request number are required.")
+        print_error("Repository name and pull request number are required.")
         return
 
-    headers = get_github_headers(github_token)
     base_url = f"https://api.github.com/repos/{github_username}/{repo_name}"
 
     try:
         if action == "merge":
             url = f"{base_url}/pulls/{pr_number}/merge"
-            response = requests.put(url, headers=headers)
+            response = github_request("PUT", url, github_token)
             response.raise_for_status()
-            print("Pull request merged successfully!")
+            print_success("Pull request merged successfully!")
 
         elif action == "close":
             url = f"{base_url}/pulls/{pr_number}"
             data = {"state": "closed"}
-            response = requests.patch(url, headers=headers, json=data)
+            response = github_request("PATCH", url, github_token, json=data)
             response.raise_for_status()
-            print("Pull request closed successfully!")
+            print_success("Pull request closed successfully!")
 
         elif action == "comment":
             url = f"{base_url}/issues/{pr_number}/comments"
             data = {"body": comment}
-            response = requests.post(url, headers=headers, json=data)
+            response = github_request("POST", url, github_token, json=data)
             response.raise_for_status()
-            print("Comment added successfully!")
+            print_success("Comment added successfully!")
 
-    except requests.exceptions.RequestException as e:
-        print(f"An error occurred while communicating with the GitHub API: {e}")
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print_error(f"Pull request operation failed: {e}")
 
 def request_code_review(github_username, github_token, config, args=None):
     """Request code reviews for specific files."""
     if args and args.dry_run:
-        print("*** Dry Run Mode: No changes will be made. ***")
-        print("Would request a code review.")
+        print_info("*** Dry Run Mode: No changes will be made. ***")
+        print_info("Would request a code review.")
         return
 
     if args and args.repo:
         repo_name = args.repo
     else:
-        repo_name = input("Enter repository name: ")
+        repo_name = inquirer.prompt([inquirer.Text("repo", message="Enter the repository name")])["repo"]
 
     # Create a new branch for the review
     branch_name = f"review-{int(time.time())}"
@@ -89,7 +86,7 @@ def request_code_review(github_username, github_token, config, args=None):
     try:
         # Create and switch to the new branch
         subprocess.run(["git", "checkout", "-b", branch_name], check=True)
-        print(f"Created and switched to new branch: {branch_name}")
+        print_info(f"Created and switched to new branch: {branch_name}")
 
         if args and args.files:
             files = args.files.split(",")
@@ -100,16 +97,16 @@ def request_code_review(github_username, github_token, config, args=None):
         if files:
             # Add the specified files to the branch
             subprocess.run(["git", "add"] + files, check=True)
-            print(f"Added files to the branch: {files}")
+            print_info(f"Added files to the branch: {files}")
 
             # Commit the changes
             commit_message = f"Code review request for: {', '.join(files)}"
             subprocess.run(["git", "commit", "-m", commit_message], check=True)
-            print("Committed changes to the branch.")
+            print_info("Committed changes to the branch.")
 
         # Push the new branch to GitHub
         subprocess.run(["git", "push", "-u", "origin", branch_name], check=True)
-        print("Pushed the new branch to GitHub.")
+        print_info("Pushed the new branch to GitHub.")
 
         reviewers = []
         if args and args.reviewers:
@@ -131,16 +128,16 @@ def request_code_review(github_username, github_token, config, args=None):
 
         if response.status_code == 201:
             pr_data = response.json()
-            print("\nPull request created successfully!")
-            print(f"View it here: {pr_data['html_url']}")
+            print_success("\nPull request created successfully!")
+            print_info(f"View it here: {pr_data['html_url']}")
         else:
-            print(f"\nError creating pull request: {response.status_code} - {response.text}")
+            print_error(f"\nError creating pull request: {response.status_code} - {response.text}")
 
     except subprocess.CalledProcessError as e:
-        print(f"An error occurred while running a git command: {e}")
+        print_error(f"An error occurred while running a git command: {e}")
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print_error(f"An error occurred: {e}")
     finally:
         # Switch back to the main branch
         subprocess.run(["git", "checkout", "main"], check=True)
-        print("Switched back to the main branch.")
+        print_info("Switched back to the main branch.")

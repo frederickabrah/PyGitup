@@ -1,6 +1,8 @@
+
 import os
 import yaml
 import getpass
+from ..utils.ui import print_success, print_error, print_info, print_header, print_warning
 
 # Default configuration
 DEFAULT_CONFIG = {
@@ -63,7 +65,7 @@ def load_config(config_path=None):
                     if key in file_config:
                         config[key].update(file_config[key])
         except Exception as e:
-            print(f"Warning: Could not load config file {config_path}: {e}")
+            print_warning(f"Could not load config file {config_path}: {e}")
     
     return config
 
@@ -74,7 +76,7 @@ def get_github_token(config):
             with open(config["github"]["token_file"], 'r') as f:
                 return f.read().strip()
         except Exception as e:
-            print(f"Warning: Could not read token file: {e}")
+            print_warning(f"Could not read token file: {e}")
     
     token = os.environ.get("GITHUB_TOKEN")
     if token:
@@ -95,8 +97,8 @@ def get_github_username(config):
 
 def configuration_wizard():
     """Guides the user through creating a pygitup.yaml configuration file."""
-    print("\n--- PyGitUp Configuration Wizard ---")
-    print("This wizard will help you create a pygitup.yaml file to store your default settings.")
+    print_header("PyGitUp Configuration Wizard")
+    print_info("This wizard will help you create a pygitup.yaml file to store your default settings.")
 
     config = DEFAULT_CONFIG.copy()
 
@@ -108,6 +110,6 @@ def configuration_wizard():
     try:
         with open("pygitup.yaml", "w") as f:
             yaml.dump(config, f, default_flow_style=False)
-        print("\nConfiguration saved successfully to pygitup.yaml!")
+        print_success("\nConfiguration saved successfully to pygitup.yaml!")
     except Exception as e:
-        print(f"\nError saving configuration: {e}")
+        print_error(f"\nError saving configuration: {e}")

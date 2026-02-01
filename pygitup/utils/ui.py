@@ -50,7 +50,7 @@ def display_menu(options):
     categories = {
         "Core": ["project", "file", "batch", "template"],
         "Git": ["branch", "stash", "tag", "cherry-pick", "smart-push"],
-        "GitHub": ["release", "multi-repo", "request-review", "gist", "webhook", "actions", "pr", "visibility", "delete-repo", "repo-info"],
+        "GitHub": ["release", "multi-repo", "request-review", "gist", "webhook", "actions", "pr", "visibility", "delete-repo", "repo-info", "bulk-mgmt"],
         "Tools": ["scan-todos", "offline-queue", "process-queue", "generate-docs", "analytics", "audit", "configure"]
     }
 
@@ -88,6 +88,25 @@ def display_repo_info(data):
 
     for label, value in fields.items():
         grid.add_row(f"{label}:", str(value))
+
+    # Health & Activity Section
+    if 'health' in data and data['health']:
+        health = data['health']
+        grid.add_row("", "")
+        grid.add_row("[bold]Health & Activity[/bold]", "")
+        
+        if 'development_velocity_days' in health:
+            grid.add_row("Dev Velocity (Median):", f"{health['development_velocity_days']} days/commit")
+        
+        if 'activity_status' in health:
+            status_color = "green" if health['activity_status'] == "Active/Bursting" else "white"
+            grid.add_row("Activity Status:", f"[{status_color}]{health['activity_status']}[/{status_color}]")
+            
+        if 'closed_issues' in health:
+            grid.add_row("Closed Issues:", str(health['closed_issues']))
+            
+        if 'contributors_count' in health:
+            grid.add_row("Total Contributors:", str(health['contributors_count']))
 
     # Traffic analytics section if available
     if 'traffic' in data and data['traffic']:
