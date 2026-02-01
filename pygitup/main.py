@@ -96,7 +96,8 @@ def main():
             }
 
             display_menu(menu_options)
-            choice = input("\n👉 Enter your choice (0-29): ")
+            max_choice = max([int(k) for k in menu_options.keys() if k.isdigit()])
+            choice = input(f"\n👉 Enter your choice (0-{max_choice}): ")
             
             if choice == '0':
                 print_info("Goodbye! 🚀")
