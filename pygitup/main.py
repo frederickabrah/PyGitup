@@ -229,7 +229,7 @@ def main():
                     configuration_wizard()
                     config = load_config(args.config)
                     github_username = get_github_username(config)
-                    github_token = get_github_token(config)
+                    github_token = get_github_token(config))
             else:
                 print_error("Invalid mode selected.")
                 if not is_interactive: sys.exit(1)
@@ -242,9 +242,9 @@ def main():
             
             input("\n⌨️  Press Enter to return to the menu...")
             # Clear screen for next iteration
-            import os
             os.system('cls' if os.name == 'nt' else 'clear')
             show_banner()
+
     except KeyboardInterrupt:
         print("\n")
         print_info("PyGitUp interrupted by user. Exiting...")
