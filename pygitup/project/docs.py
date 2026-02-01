@@ -6,6 +6,7 @@ import requests
 
 from ..github.api import get_repo_contents
 from ..utils.ui import print_success, print_error, print_info, print_header, print_warning
+from ..utils.ai import generate_ai_readme
 
 def extract_python_docs(content, filename):
     """Extract documentation from Python code using AST."""
@@ -169,6 +170,29 @@ def generate_documentation(github_username, github_token, config, args=None):
         output_dir = output_dir_input if output_dir_input else output_dir
     
     print_info(f"Generating documentation for {repo_name}...")
+    
+    # AI README Option
+    ai_key = config["github"].get("ai_api_key")
+    if ai_key:
+        print("\n[bold]Documentation Type:[/bold]")
+        print("1: Standard Technical API Reference")
+        print("2: AI-Generated Professional README")
+        doc_type = input("\n👉 Choice (1/2) [1]: ")
+        
+        if doc_type == '2':
+            print_info("🤖 AI is analyzing project structure to write your README...")
+            repo_resp = get_repo_contents(github_username, repo_name, github_token)
+            if repo_resp.status_code == 200:
+                files = [item['path'] for item in repo_resp.json()]
+                ai_readme = generate_ai_readme(ai_key, repo_name, "\n".join(files))
+                if ai_readme:
+                    os.makedirs(output_dir, exist_ok=True)
+                    with open(os.path.join(output_dir, "README.md"), 'w') as f:
+                        f.write(ai_readme)
+                    print_success(f"AI README generated successfully at {output_dir}/README.md")
+                    return
+            print_error("AI README generation failed. Falling back to standard.")
+
     print_info(f"Output directory: {output_dir}")
     
     # Create output directory if it doesn't exist

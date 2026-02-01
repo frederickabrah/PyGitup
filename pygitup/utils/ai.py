@@ -102,6 +102,63 @@ def generate_ai_release_notes(api_key, repo_name, commit_history):
     except Exception:
         return None
 
+def suggest_todo_fix(api_key, todo_text, context_code):
+    """Uses Gemini to suggest a code fix for a discovered TODO."""
+    if not api_key: return None
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    prompt = f"""
+    You are a Senior Software Engineer. I found a TODO in my code:
+    "{todo_text}"
+    
+    SURROUNDING CONTEXT:
+    {context_code}
+    
+    Please provide:
+    1. A brief explanation of how to resolve this.
+    2. A clean, optimized code snippet that implements the fix.
+    
+    Format the response as clear Markdown.
+    """
+    
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+    try:
+        response = requests.post(url, json=payload, timeout=20)
+        if response.status_code == 200:
+            return response.json()['candidates'][0]['content']['parts'][0]['text']
+        return None
+    except Exception:
+        return None
+
+def generate_ai_readme(api_key, project_name, file_list):
+    """Uses Gemini to generate a professional README based on file structure."""
+    if not api_key: return None
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    prompt = f"""
+    Write a professional, high-quality README.md for the project '{project_name}'.
+    
+    PROJECT STRUCTURE:
+    {file_list}
+    
+    INCLUDE:
+    1. A catchy title and project description.
+    2. Key features (deduced from the file names).
+    3. Installation instructions.
+    4. Usage examples.
+    
+    Make it look like a top-tier open source project.
+    """
+    
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+    try:
+        response = requests.post(url, json=payload, timeout=30)
+        if response.status_code == 200:
+            return response.json()['candidates'][0]['content']['parts'][0]['text']
+        return None
+    except Exception:
+        return None
+
 def ai_commit_workflow(github_username, github_token, config):
     """Orchestrates the AI commit process."""
     api_key = config["github"].get("ai_api_key")
