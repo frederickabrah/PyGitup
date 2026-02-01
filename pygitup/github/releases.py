@@ -1,8 +1,28 @@
+import os
+import subprocess
+import tempfile
 from .api import create_release, get_commit_history
-from ..utils.ui import print_success, print_error, print_info, print_header
+from ..utils.ui import print_success, print_error, print_info, print_header, print_warning
+from ..utils.ai import generate_ai_release_notes
+
+def open_editor(initial_content=""):
+    """Opens the system default editor to edit release notes."""
+    editor = os.environ.get('EDITOR', 'nano')
+    with tempfile.NamedTemporaryFile(suffix=".md", mode='w+', delete=False) as tf:
+        tf.write(initial_content)
+        temp_path = tf.name
+    
+    try:
+        subprocess.run([editor, temp_path], check=True)
+        with open(temp_path, 'r') as f:
+            content = f.read()
+        return content.strip()
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
 def get_release_input(config, args, github_username, github_token):
-    """Get release input from user or arguments."""
+    """Get release input from user or arguments with AI support."""
     if args and args.repo:
         repo_name = args.repo
     else:
@@ -20,13 +40,39 @@ def get_release_input(config, args, github_username, github_token):
         name_input = input(f"Enter release name (default: {default_name}): ")
         name = name_input if name_input else default_name
     
-    # Generate changelog if requested
+    # Release Notes Logic
     changelog = ""
-    if args and args.generate_changelog:
+    print("\n[bold]Release Notes Options:[/bold]")
+    print("1: [cyan]AI-Generated Summary[/cyan]")
+    print("2: [green]Auto-Changelog (Commit list)[/green]")
+    print("3: [yellow]Manual Editor (Nano/Vim)[/yellow]")
+    print("4: [white]Skip / Basic prompt[/white]")
+    
+    note_choice = input("\n👉 Choice: ")
+    
+    if note_choice == '1':
+        print_info("🤖 AI is analyzing your project history...")
+        resp = get_commit_history(github_username, repo_name, github_token)
+        if resp.status_code == 200:
+            ai_key = config["github"].get("ai_api_key")
+            changelog = generate_ai_release_notes(ai_key, repo_name, resp.json())
+            # Let user tweak the AI's output
+            if changelog:
+                confirm = input("AI notes generated. Edit them before publishing? (y/n): ").lower()
+                if confirm == 'y':
+                    changelog = open_editor(changelog)
+        else:
+            print_error("Failed to fetch history for AI.")
+            
+    elif note_choice == '2':
         changelog = generate_changelog(github_username, repo_name, github_token, version)
-    elif not args or not args.message:
-        changelog_input = input("Enter release notes (optional): ")
-        changelog = changelog_input
+    elif note_choice == '3':
+        changelog = open_editor("# Release Notes for " + version + "\n\n")
+    else:
+        if args and args.message:
+            changelog = args.message
+        else:
+            changelog = input("Enter release notes: ")
     
     return repo_name, version, name, changelog
 
@@ -61,6 +107,20 @@ def create_release_tag(github_username, github_token, config, args=None):
     
     print_info(f"Creating release {version} for {repo_name}...")
     
+    # 1. Automated Local Tagging
+    try:
+        # Check if we are in the target repo
+        if os.path.isdir(".git"):
+            print_info("Local Git repository detected. Synchronizing tags...")
+            # Create tag
+            subprocess.run(["git", "tag", "-a", version, "-m", name], capture_output=True)
+            # Push tag
+            subprocess.run(["git", "push", "origin", version], capture_output=True)
+            print_success(f"Local tag '{version}' pushed to origin.")
+    except Exception as e:
+        print_warning(f"Local tagging skipped/failed: {e}")
+
+    # 2. GitHub API Release
     response = create_release(github_username, repo_name, github_token, version, name, changelog)
     
     if response.status_code == 201:

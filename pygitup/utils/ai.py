@@ -62,6 +62,46 @@ def generate_ai_commit_message(api_key, diff_text):
         print_error(f"Connection failed: {e}")
         return None
 
+def generate_ai_release_notes(api_key, repo_name, commit_history):
+    """Uses Gemini to summarize recent history into a professional release announcement."""
+    if not api_key:
+        print_error("Gemini API Key missing.")
+        return None
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    
+    # Format history for the AI
+    history_text = "\n".join([f"- {c['commit']['message'].splitlines()[0]}" for c in commit_history[:30]])
+    
+    prompt = f"""
+    You are a professional Product Manager. 
+    Write a high-quality Release Announcement for the repository '{repo_name}' based on these recent commits:
+    
+    {history_text}
+    
+    RULES:
+    1. Start with a catchy 'What's New' or 'Highlights' section.
+    2. Group technical changes into logical categories (UI, Core, Security, etc.).
+    3. Use a professional yet exciting tone.
+    4. Keep it in clean Markdown format.
+    5. Do not include meta-text, only the release notes.
+    """
+
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }]
+    }
+
+    try:
+        response = requests.post(url, json=payload, timeout=30)
+        if response.status_code == 200:
+            data = response.json()
+            return data['candidates'][0]['content']['parts'][0]['text'].strip()
+        return None
+    except Exception:
+        return None
+
 def ai_commit_workflow(github_username, github_token, config):
     """Orchestrates the AI commit process."""
     api_key = config["github"].get("ai_api_key")
