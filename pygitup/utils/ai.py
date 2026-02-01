@@ -160,13 +160,26 @@ def generate_ai_readme(api_key, project_name, file_list):
         return None
 
 def ai_commit_workflow(github_username, github_token, config):
-    """Orchestrates the AI commit process."""
+    """Orchestrates the AI commit process with auto-staging support."""
     api_key = config["github"].get("ai_api_key")
     
     diff = get_git_diff()
     if not diff:
-        print_warning("No staged changes found. Use 'git add' to stage files before AI commit.")
-        return False
+        # Check if there are unstaged changes
+        unstaged = subprocess.run(["git", "diff"], capture_output=True, text=True).stdout.strip()
+        if unstaged:
+            print_warning("No changes staged, but modified files detected.")
+            confirm = input("Would you like me to stage all changes for you? (y/n): ").lower()
+            if confirm == 'y':
+                subprocess.run(["git", "add", "."], check=True)
+                print_success("Staged all changes.")
+                diff = get_git_diff() # Refresh diff
+            else:
+                print_info("Please stage files manually and try again.")
+                return False
+        else:
+            print_warning("No changes detected in the repository.")
+            return False
 
     print_info("🤖 AI is analyzing your changes...")
     
