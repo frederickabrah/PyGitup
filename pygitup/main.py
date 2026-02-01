@@ -1,7 +1,7 @@
 import sys
 
 from .core.args import create_parser
-from .core.config import load_config, get_github_username, get_github_token, configuration_wizard
+from .core.config import load_config, get_github_username, get_github_token, configuration_wizard, list_profiles, set_active_profile, get_active_profile_path
 from .project.project_ops import upload_project_directory, upload_single_file, upload_batch_files, update_multiple_repos, manage_bulk_repositories, migrate_repository
 from .project.templates import create_project_from_template
 from .github.releases import create_release_tag
@@ -91,6 +91,7 @@ def main():
                 '28': ("Migrate/Mirror Repository from any source", "migrate"),
                 '29': ("Network & Fork Intelligence (OSINT)", "fork-intel"),
                 '30': ("AI-Powered Semantic Commit", "ai-commit"),
+                '31': ("Manage Accounts (Switch/Add/List)", "accounts"),
                 '0': ("Exit PyGitUp", "exit")
             }
 
@@ -175,6 +176,40 @@ def main():
                 print_error("Invalid repository URL.")
         elif mode == "ai-commit":
             ai_commit_workflow(github_username, github_token, config)
+        elif mode == "accounts":
+            print_header("Account & Profile Manager")
+            profiles = list_profiles()
+            active_path = get_active_profile_path()
+            active_name = os.path.basename(active_path).replace(".yaml", "")
+
+            print_info(f"Current Active Profile: [bold green]{active_name}[/bold green]")
+            print("\nAvailable Profiles:")
+            for p in profiles:
+                marker = "➜ " if p == active_name else "  "
+                print(f"{marker}{p}")
+            
+            print("\n[bold]Options:[/bold]")
+            print("1: Switch Profile")
+            print("2: Add New Account")
+            print("3: Back")
+            
+            acc_choice = input("\n👉 Choice: ")
+            if acc_choice == '1':
+                target = input("Enter profile name to switch to: ")
+                success, msg = set_active_profile(target)
+                if success:
+                    print_success(msg)
+                    # Reload everything
+                    config = load_config(args.config)
+                    github_username = get_github_username(config)
+                    github_token = get_github_token(config)
+                else:
+                    print_error(msg)
+            elif acc_choice == '2':
+                configuration_wizard()
+                config = load_config(args.config)
+                github_username = get_github_username(config)
+                github_token = get_github_token(config)
         else:
             print_error("Invalid mode selected.")
             if not is_interactive: sys.exit(1)
