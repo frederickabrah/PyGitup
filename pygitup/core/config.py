@@ -43,92 +43,267 @@ DEFAULT_CONFIG = {
 }
 
 def get_config_dir():
+
     """Returns the platform-specific hidden directory for PyGitUp config."""
+
     home = os.path.expanduser("~")
-    # Stealth location: hidden folder in home directory
+
     config_dir = os.path.join(home, ".pygitup_config")
-    if not os.path.exists(config_dir):
-        os.makedirs(config_dir, exist_ok=True)
+
+    profiles_dir = os.path.join(config_dir, "profiles")
+
+    
+
+    if not os.path.exists(profiles_dir):
+
+        os.makedirs(profiles_dir, exist_ok=True)
+
     return config_dir
 
-def load_config(config_path=None):
-    """Load configuration from the stealth global path or return defaults."""
-    config = DEFAULT_CONFIG.copy()
+
+
+def get_active_profile_path():
+
+    """Returns the path to the active profile's config file."""
+
+    config_dir = get_config_dir()
+
+    settings_path = os.path.join(config_dir, "settings.json")
+
     
-    if config_path is None:
-        # Prioritize the stealth global path
-        config_path = os.path.join(get_config_dir(), "config.yaml")
-    
-    if os.path.exists(config_path):
+
+    active_profile = "default"
+
+    if os.path.exists(settings_path):
+
         try:
-            with open(config_path, 'r') as f:
-                file_config = yaml.safe_load(f)
-                if file_config:
-                    for key in config:
-                        if key in file_config:
-                            config[key].update(file_config[key])
-        except Exception as e:
-            print_warning(f"Could not load stealth config: {e}")
+
+            with open(settings_path, 'r') as f:
+
+                settings = json.load(f)
+
+                active_profile = settings.get("active_profile", "default")
+
+        except Exception:
+
+            pass
+
+            
+
+    return os.path.join(config_dir, "profiles", f"{active_profile}.yaml")
+
+
+
+def set_active_profile(profile_name):
+
+    """Sets the active profile in settings.json."""
+
+    config_dir = get_config_dir()
+
+    settings_path = os.path.join(config_dir, "settings.json")
+
     
+
+    profile_path = os.path.join(config_dir, "profiles", f"{profile_name}.yaml")
+
+    if not os.path.exists(profile_path):
+
+        return False, f"Profile '{profile_name}' does not exist."
+
+
+
+    try:
+
+        with open(settings_path, 'w') as f:
+
+            json.dump({"active_profile": profile_name}, f)
+
+        return True, f"Switched to profile: {profile_name}"
+
+    except Exception as e:
+
+        return False, str(e)
+
+
+
+def list_profiles():
+
+    """Lists all available profiles."""
+
+    profiles_dir = os.path.join(get_config_dir(), "profiles")
+
+    return [f.replace(".yaml", "") for f in os.listdir(profiles_dir) if f.endswith(".yaml")]
+
+
+
+def load_config(config_path=None):
+
+    """Load configuration from the active stealth profile or return defaults."""
+
+    config = DEFAULT_CONFIG.copy()
+
+    
+
+    if config_path is None:
+
+        config_path = get_active_profile_path()
+
+    
+
+    if os.path.exists(config_path):
+
+        try:
+
+            with open(config_path, 'r') as f:
+
+                file_config = yaml.safe_load(f)
+
+                if file_config:
+
+                    # Deep merge dictionaries
+
+                    for section in file_config:
+
+                        if section in config:
+
+                            config[section].update(file_config[section])
+
+        except Exception as e:
+
+            print_warning(f"Could not load stealth config: {e}")
+
+    
+
     return config
 
+
+
 def get_github_token(config):
+
     """Get GitHub token from config, file, or environment."""
+
     # Check if token is already in config (one-time setup)
+
     if config["github"].get("token"):
+
         return config["github"]["token"]
 
+
+
     if config["github"]["token_file"] and os.path.exists(config["github"]["token_file"]):
+
         try:
+
             with open(config["github"]["token_file"], 'r') as f:
+
                 return f.read().strip()
+
         except Exception as e:
+
             print_warning(f"Could not read token file: {e}")
+
     
+
     token = os.environ.get("GITHUB_TOKEN")
+
     if token:
+
         return token
+
     
+
     # If still not found, we really need it
-    print_warning("No GitHub Token found in stealth storage.")
+
+    print_warning("No GitHub Token found in active stealth profile.")
+
     token = getpass.getpass("🔑 Enter your GitHub Personal Access Token: ")
+
     return token
 
+
+
 def get_github_username(config):
+
     """Get GitHub username from config or environment."""
+
     if config["github"]["username"]:
+
         return config["github"]["username"]
+
     
+
     username = os.environ.get("GITHUB_USERNAME")
+
     if username:
+
         return username
+
     
+
     return input("👤 Enter your GitHub username: ")
 
-def configuration_wizard():
-    """Guides the user through one-time stealth setup."""
+
+
+def configuration_wizard(profile_name=None):
+
+    """Guides the user through one-time stealth setup for a specific profile."""
+
     print_header("PyGitUp Stealth Setup")
-    print_info("Saving credentials to a secure hidden location...")
+
+    
+
+    if not profile_name:
+
+        profile_name = input("🏷️ Enter a name for this profile (e.g., work, personal) [default]: ") or "default"
+
+    
+
+    print_info(f"Configuring profile: {profile_name}")
+
+
 
     config = DEFAULT_CONFIG.copy()
-    config_path = os.path.join(get_config_dir(), "config.yaml")
+
+    config_path = os.path.join(get_config_dir(), "profiles", f"{profile_name}.yaml")
+
+
 
     config["github"]["username"] = input(f'GitHub username: ') or config["github"]["username"]
-    # We save the token directly in the yaml now for the "Set and Forget" experience
+
     token = getpass.getpass("GitHub Token (Hidden): ")
+
     config["github"]["token"] = token 
+
     
+
     ai_key = getpass.getpass("Gemini API Key (Hidden): ")
+
     config["github"]["ai_api_key"] = ai_key
+
+
+
     try:
-        # Secure the file permissions (Owner Read/Write only)
+
+        # Secure the file permissions
+
         with open(config_path, "w") as f:
+
             yaml.dump(config, f, default_flow_style=False)
+
         
-        # On Unix systems, make the file private
+
         if os.name != 'nt':
+
             os.chmod(config_path, 0o600)
+
             
-        print_success(f"\nConfiguration locked in {config_path}")
+
+        # Automatically set as active if it's the only one or if user wants
+
+        set_active_profile(profile_name)
+
+        print_success(f"\nProfile '{profile_name}' locked and activated!")
+
     except Exception as e:
-        print_error(f"\nError locking configuration: {e}")
+
+        print_error(f"\nError locking profile: {e}")
