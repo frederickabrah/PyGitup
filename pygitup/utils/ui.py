@@ -51,7 +51,7 @@ def display_menu(options):
         "Core": ["project", "file", "batch", "template", "migrate"],
         "Git": ["branch", "stash", "tag", "cherry-pick", "smart-push"],
         "GitHub": ["release", "multi-repo", "request-review", "gist", "webhook", "actions", "pr", "visibility", "delete-repo", "repo-info", "bulk-mgmt", "fork-intel"],
-        "Tools": ["scan-todos", "offline-queue", "process-queue", "generate-docs", "analytics", "audit", "configure"]
+        "Tools": ["scan-todos", "offline-queue", "process-queue", "generate-docs", "analytics", "audit", "configure", "ai-commit"]
     }
 
     for key, value in options.items():
