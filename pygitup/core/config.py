@@ -181,71 +181,153 @@ def load_config(config_path=None):
 
 def get_github_token(config):
 
+
+
     """Get GitHub token from config, file, or environment."""
+
+
 
     # Check if token is already in config (one-time setup)
 
-    if config["github"].get("token"):
 
-        return config["github"]["token"]
+
+    token = config["github"].get("token")
+
+
+
+    if token:
+
+
+
+        return token.strip()
+
+
+
+
 
 
 
     if config["github"]["token_file"] and os.path.exists(config["github"]["token_file"]):
 
+
+
         try:
+
+
 
             with open(config["github"]["token_file"], 'r') as f:
 
+
+
                 return f.read().strip()
+
+
 
         except Exception as e:
 
+
+
             print_warning(f"Could not read token file: {e}")
 
+
+
     
+
+
 
     token = os.environ.get("GITHUB_TOKEN")
 
+
+
     if token:
 
-        return token
+
+
+        return token.strip()
+
+
 
     
 
+
+
     # If still not found, we really need it
+
+
 
     print_warning("No GitHub Token found in active stealth profile.")
 
-    token = getpass.getpass("🔑 Enter your GitHub Personal Access Token: ")
+
+
+    token = getpass.getpass("🔑 Enter your GitHub Personal Access Token: ").strip()
+
+
 
     return token
 
 
 
+
+
+
+
 def get_github_username(config):
+
+
 
     """Get GitHub username from config or environment."""
 
-    if config["github"]["username"]:
 
-        return config["github"]["username"]
+
+    user = config["github"]["username"]
+
+
+
+    if user:
+
+
+
+        return user.strip()
+
+
 
     
+
+
 
     username = os.environ.get("GITHUB_USERNAME")
 
+
+
     if username:
 
-        return username
+
+
+        return username.strip()
+
+
 
     
 
-    return input("👤 Enter your GitHub username: ")
+
+
+    return input("👤 Enter your GitHub username: ").strip()
+
+
+
+
 
 
 
 def configuration_wizard(profile_name=None):
+
+
+
+    # ... (rest of the function)
+
+
+
+
 
 
 
@@ -405,95 +487,183 @@ def configuration_wizard(profile_name=None):
 
 
 
-    # Username
+        # Username
 
 
 
-    current_user = config["github"].get("username", "")
 
 
 
-    if mode == "overwrite" or not current_user:
 
+        current_user = config["github"].get("username", "")
 
 
-        val = input(f'GitHub username: ')
 
 
 
-        if val: config["github"]["username"] = val
 
 
+        if mode == "overwrite" or not current_user:
 
-    else:
 
 
 
-        print_info(f"Username already set: {current_user}")
 
 
 
+            val = input(f'GitHub username: ').strip()
 
 
 
 
-    # GitHub Token
 
 
 
-    current_token = config["github"].get("token", "")
+            if val: config["github"]["username"] = val
 
 
 
-    if mode == "overwrite" or not current_token:
 
 
 
-        val = getpass.getpass("GitHub Token (Hidden): ")
 
+        else:
 
 
-        if val: config["github"]["token"] = val
 
 
 
-    else:
 
 
+            print_info(f"Username already set: {current_user}")
 
-        print_info("GitHub Token already set.")
 
 
 
 
 
 
+    
 
-    # AI API Key
 
 
 
-    current_ai = config["github"].get("ai_api_key", "")
 
 
 
-    if mode == "overwrite" or not current_ai:
+        # GitHub Token
 
 
 
-        val = getpass.getpass("Gemini API Key (Hidden): ")
 
 
 
-        if val: config["github"]["ai_api_key"] = val
 
+        current_token = config["github"].get("token", "")
 
 
-    else:
 
 
 
-        print_info("Gemini API Key already set.")
+
+
+        if mode == "overwrite" or not current_token:
+
+
+
+
+
+
+
+            val = getpass.getpass("GitHub Token (Hidden): ").strip()
+
+
+
+
+
+
+
+            if val: config["github"]["token"] = val
+
+
+
+
+
+
+
+        else:
+
+
+
+
+
+
+
+            print_info("GitHub Token already set.")
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+        # AI API Key
+
+
+
+
+
+
+
+        current_ai = config["github"].get("ai_api_key", "")
+
+
+
+
+
+
+
+        if mode == "overwrite" or not current_ai:
+
+
+
+
+
+
+
+            val = getpass.getpass("Gemini API Key (Hidden): ").strip()
+
+
+
+
+
+
+
+            if val: config["github"]["ai_api_key"] = val
+
+
+
+
+
+
+
+        else:
+
+
+
+
+
+
+
+            print_info("Gemini API Key already set.")
 
 
 
