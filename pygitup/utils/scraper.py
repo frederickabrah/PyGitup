@@ -84,6 +84,27 @@ def scrape_repo_info(url):
         data['clone_url'] = f"{url}.git"
         data['created_at'] = "Unknown (Scraped)" # Hard to scrape reliably without parsing timestamps
         
+        # OSINT: Used By (Dependents)
+        used_by_tag = soup.find('a', href=lambda x: x and '/network/dependents' in x)
+        if used_by_tag:
+            count_span = used_by_tag.find('span', class_='Counter')
+            data['used_by'] = count_span.get('title') if count_span else used_by_tag.get_text(strip=True)
+        
+        # OSINT: Sponsorship Status
+        sponsor_btn = soup.find('a', href=lambda x: x and '/sponsors/' in x)
+        data['is_sponsored'] = True if sponsor_btn else False
+
+        # OSINT: Topics/Tags
+        topics = []
+        topic_tags = soup.find_all('a', class_='topic-tag')
+        for t in topic_tags:
+            topics.append(t.get_text(strip=True))
+        data['topics'] = topics
+
+        # OSINT: Social Preview Image
+        og_image = soup.find('meta', property='og:image')
+        data['social_preview'] = og_image.get('content') if og_image else None
+        
         return data
         
     except Exception as e:

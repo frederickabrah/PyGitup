@@ -83,8 +83,13 @@ def display_repo_info(data):
         "Forks": str(data.get("forks_count")),
         "Issues": f"{data.get('open_issues_count')} open",
         "Created": data.get("created_at"),
-        "Clone URL": data.get("clone_url")
+        "Clone URL": data.get("clone_url"),
+        "Used By": data.get("used_by", "0"),
+        "Sponsors": "💖 Active" if data.get("is_sponsored") else "None"
     }
+
+    if data.get("topics"):
+        fields["Topics"] = ", ".join(data.get("topics"))
 
     for label, value in fields.items():
         grid.add_row(f"{label}:", str(value))
