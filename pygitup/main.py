@@ -32,6 +32,20 @@ def main():
         show_banner()
         check_for_updates()
 
+        # Smart Start: Check if we are in a git repo
+        if not os.path.isdir(".git") and not any(arg in sys.argv for arg in ["--help", "init", "clone", "migrate", "template"]):
+            print_info("You are not currently in a Git repository.")
+            target_path = input("📂 Enter the path to your project (or Enter to stay here): ").strip()
+            if target_path:
+                if os.path.isdir(target_path):
+                    try:
+                        os.chdir(target_path)
+                        print_success(f"Switched context to: {os.getcwd()}")
+                    except Exception as e:
+                        print_error(f"Could not switch directory: {e}")
+                else:
+                    print_error(f"Directory not found: {target_path}")
+
         # Parse command line arguments
         parser = create_parser()
         args = parser.parse_args()
