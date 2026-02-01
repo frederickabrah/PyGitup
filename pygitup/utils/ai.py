@@ -69,37 +69,20 @@ def generate_ai_release_notes(api_key, repo_name, commit_history):
         return None
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-    
-    # Format history for the AI
     history_text = "\n".join([f"- {c['commit']['message'].splitlines()[0]}" for c in commit_history[:30]])
     
-    prompt = f"""
-    You are a professional Product Manager. 
-    Write a high-quality Release Announcement for the repository '{repo_name}' based on these recent commits:
-    
-    {history_text}
-    
-    RULES:
-    1. Start with a catchy 'What's New' or 'Highlights' section.
-    2. Group technical changes into logical categories (UI, Core, Security, etc.).
-    3. Use a professional yet exciting tone.
-    4. Keep it in clean Markdown format.
-    5. Do not include meta-text, only the release notes.
-    """
-
-    payload = {
-        "contents": [{
-            "parts": [{"text": prompt}]
-        }]
-    }
+    prompt = f"Write a professional Release Announcement for '{repo_name}' based on these commits:\n{history_text}"
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
 
     try:
         response = requests.post(url, json=payload, timeout=30)
         if response.status_code == 200:
-            data = response.json()
-            return data['candidates'][0]['content']['parts'][0]['text'].strip()
-        return None
-    except Exception:
+            return response.json()['candidates'][0]['content']['parts'][0]['text'].strip()
+        else:
+            print_error(f"AI Release Notes failed: {response.status_code} - {response.text}")
+            return None
+    except Exception as e:
+        print_error(f"AI Connection failed: {e}")
         return None
 
 def suggest_todo_fix(api_key, todo_text, context_code):
@@ -107,56 +90,39 @@ def suggest_todo_fix(api_key, todo_text, context_code):
     if not api_key: return None
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-    prompt = f"""
-    You are a Senior Software Engineer. I found a TODO in my code:
-    "{todo_text}"
-    
-    SURROUNDING CONTEXT:
-    {context_code}
-    
-    Please provide:
-    1. A brief explanation of how to resolve this.
-    2. A clean, optimized code snippet that implements the fix.
-    
-    Format the response as clear Markdown.
-    """
-    
+    prompt = f"Suggest a fix for this TODO: \"{todo_text}\" in this context:\n{context_code}"
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
+    
     try:
         response = requests.post(url, json=payload, timeout=20)
         if response.status_code == 200:
             return response.json()['candidates'][0]['content']['parts'][0]['text']
-        return None
-    except Exception:
+        else:
+            print_error(f"AI TODO Fix failed: {response.status_code} - {response.text}")
+            return None
+    except Exception as e:
+        print_error(f"AI Connection failed: {e}")
         return None
 
 def generate_ai_readme(api_key, project_name, file_list):
     """Uses Gemini to generate a professional README based on file structure."""
-    if not api_key: return None
+    if not api_key: 
+        print_error("Gemini API Key missing.")
+        return None
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-    prompt = f"""
-    Write a professional, high-quality README.md for the project '{project_name}'.
-    
-    PROJECT STRUCTURE:
-    {file_list}
-    
-    INCLUDE:
-    1. A catchy title and project description.
-    2. Key features (deduced from the file names).
-    3. Installation instructions.
-    4. Usage examples.
-    
-    Make it look like a top-tier open source project.
-    """
-    
+    prompt = f"Write a professional README.md for '{project_name}' given this file structure:\n{file_list}"
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
+    
     try:
         response = requests.post(url, json=payload, timeout=30)
         if response.status_code == 200:
             return response.json()['candidates'][0]['content']['parts'][0]['text']
-        return None
-    except Exception:
+        else:
+            print_error(f"AI README failed: {response.status_code} - {response.text}")
+            return None
+    except Exception as e:
+        print_error(f"AI Connection failed: {e}")
         return None
 
 def ai_commit_workflow(github_username, github_token, config):
