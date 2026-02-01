@@ -1,8 +1,51 @@
 import inquirer
 from urllib.parse import urlparse
-from .api import get_repo_info, github_request, get_commit_history, get_issues, get_contributors, get_repo_languages, get_community_profile, get_latest_release
-from ..utils.ui import display_repo_info, display_traffic_trends, print_error, print_warning
-from ..utils.scraper import scrape_repo_info
+from .api import get_repo_info, github_request, get_commit_history, get_issues, get_contributors, get_repo_languages, get_community_profile, get_latest_release, get_repo_forks, compare_commits
+from ..utils.ui import display_repo_info, display_traffic_trends, print_error, print_warning, print_info, print_header, print_success
+
+def get_fork_intelligence(owner, repo, token):
+    """Deep scan of the Forks Network to find hidden community improvements."""
+    print_header("Network & Fork Intelligence")
+    print_info(f"Scanning community forks for {owner}/{repo}...")
+    
+    try:
+        forks_resp = get_repo_forks(owner, repo, token)
+        if forks_resp.status_code != 200:
+            print_error("Failed to fetch forks list.")
+            return
+            
+        forks = forks_resp.json()
+        if not forks:
+            print_info("No forks found for this repository.")
+            return
+            
+        print_info(f"Analyzing {len(forks)} forks for unique activity...")
+        
+        found_unique = False
+        for fork in forks:
+            f_owner = fork['owner']['login']
+            f_name = fork['name']
+            f_default_branch = fork['default_branch']
+            
+            # Compare the fork's default branch against the upstream's default branch
+            # Logic: HEAD is the fork, BASE is the upstream
+            compare_resp = github_request("GET", 
+                f"https://api.github.com/repos/{f_owner}/{f_name}/compare/{owner}:{f_default_branch}...{f_default_branch}", 
+                token)
+            
+            if compare_resp.status_code == 200:
+                data = compare_resp.json()
+                ahead_by = data.get('ahead_by', 0)
+                if ahead_by > 0:
+                    found_unique = True
+                    print_success(f"🔍 Discovery: @{f_owner} is AHEAD by {ahead_by} commits!")
+                    print(f"   Link: {fork['html_url']}/compare/{owner}:{f_default_branch}...{f_default_branch}")
+        
+        if not found_unique:
+            print_info("No unique community work detected in forks (all forks are in-sync or behind).")
+            
+    except Exception as e:
+        print_error(f"Fork intelligence scan failed: {e}")
 
 def parse_github_url(url):
     """Extract owner and repo name from a GitHub URL."""

@@ -466,6 +466,44 @@ def update_multiple_repos(github_username, github_token, config, args=None):
     
     print_success(f"Multi-repository update complete: {success_count}/{len(repo_names)} successful.")
 
+import math
+import shutil
+import tempfile
+
+def migrate_repository(github_username, github_token, config, args=None):
+    """Mirror a repository from any source to GitHub with full history."""
+    print_header("The Great Migration Porter")
+    
+    src_url = args.url if args and hasattr(args, 'url') and args.url else input("🔗 Enter Source Repository URL (GitLab/Bitbucket/etc): ")
+    dest_name = args.repo if args and hasattr(args, 'repo') and args.repo else input("📦 Enter Destination GitHub Repository Name: ")
+    
+    is_private = args.private if args and hasattr(args, 'private') else input("🔒 Make destination private? (y/n) [y]: ").lower() != 'n'
+
+    print_info(f"Establishing destination on GitHub...")
+    # Ensure dest exists
+    create_or_get_github_repository(dest_name, f"Mirrored from {src_url}", is_private, github_username, github_token)
+    
+    dest_url = f"https://{github_username}:{github_token}@github.com/{github_username}/{dest_name}.git"
+    
+    # Use a temporary directory for the mirror operation
+    temp_dir = tempfile.mkdtemp()
+    try:
+        print_info("Performing mirror clone (this may take time for large repos)...")
+        subprocess.run(["git", "clone", "--mirror", src_url, temp_dir], check=True)
+        
+        os.chdir(temp_dir)
+        print_info("Pushing mirror to GitHub (preserving all branches/tags)...")
+        subprocess.run(["git", "push", "--mirror", dest_url], check=True)
+        
+        print_success(f"\nMigration Successful! 🚀")
+        print_info(f"View it at: https://github.com/{github_username}/{dest_name}")
+    except subprocess.CalledProcessError as e:
+        print_error(f"Migration failed during git operation: {e}")
+    finally:
+        # Cleanup
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        os.chdir(os.path.dirname(os.path.abspath(__file__))) # Back to relative safety
+
 def manage_bulk_repositories(github_token):
     """List all repositories and show aggregated health scores."""
     print_header("Bulk Repository Management")
