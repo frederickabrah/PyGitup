@@ -82,11 +82,30 @@ def suggest_todo_fix(api_key, todo_text, context_code):
     prompt = f"Suggest a fix for this TODO: \"{todo_text}\" in this context:\n{context_code}"
     return call_gemini_api(api_key, prompt, timeout=20)
 
-def generate_ai_readme(api_key, project_name, file_list):
-    """Generates professional README using tiered fallback."""
+def generate_ai_readme(api_key, project_name, file_list, code_context=""):
+    """Uses Gemini to generate a professional README based on structure and code content."""
     # Truncate file list if it's too massive
-    files = file_list[:5000] if len(file_list) > 5000 else file_list
-    prompt = f"Write a professional, comprehensive README.md for the project '{project_name}' based on this file structure:\n{files}"
+    files = file_list[:3000] if len(file_list) > 3000 else file_list
+    context = code_context[:7000] if len(code_context) > 7000 else code_context
+
+    prompt = f"""
+    Write a professional, high-quality README.md for the project '{project_name}'.
+    
+    PROJECT FILE STRUCTURE:
+    {files}
+    
+    CORE CODE CONTEXT (Entries & Configs):
+    {context}
+    
+    INSTRUCTIONS:
+    1. Use the code context to determine what the project actually DOES.
+    2. Write a professional introduction and feature list.
+    3. Include REAL installation steps based on the dependencies found in the context (e.g., requirements.txt, setup.py).
+    4. Provide usage examples based on the entry files (e.g., main.py, index.js).
+    5. Format in clean, beautiful Markdown.
+    
+    Do not guess. Use the provided code to be accurate.
+    """
     return call_gemini_api(api_key, prompt)
 
 def ai_commit_workflow(github_username, github_token, config):
