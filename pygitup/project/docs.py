@@ -180,11 +180,26 @@ def generate_documentation(github_username, github_token, config, args=None):
         doc_type = input("\n👉 Choice (1/2) [1]: ")
         
         if doc_type == '2':
-            print_info("🤖 AI is analyzing project structure to write your README...")
+            print_info("🤖 AI is reading your code to write a high-fidelity README...")
             repo_resp = get_repo_contents(github_username, repo_name, github_token)
             if repo_resp.status_code == 200:
-                files = [item['path'] for item in repo_resp.json()]
-                ai_readme = generate_ai_readme(ai_key, repo_name, "\n".join(files))
+                contents_list = repo_resp.json()
+                file_paths = [item['path'] for item in contents_list]
+                
+                # Context Gathering: Read the "Heart" of the project
+                code_context = ""
+                priority_files = ["main.py", "setup.py", "requirements.txt", "README.md", "pyproject.toml", "index.js", "package.json"]
+                
+                for item in contents_list:
+                    if item['name'] in priority_files and item['type'] == 'file':
+                        print_info(f"   📄 Reading {item['name']} for context...")
+                        f_resp = requests.get(item['download_url'])
+                        if f_resp.status_code == 200:
+                            # Only take the first 150 lines to stay within token limits
+                            snippet = "\n".join(f_resp.text.splitlines()[:150])
+                            code_context += f"\n--- FILE: {item['name']} ---\n{snippet}\n"
+
+                ai_readme = generate_ai_readme(ai_key, repo_name, "\n".join(file_paths), code_context)
                 if ai_readme:
                     os.makedirs(output_dir, exist_ok=True)
                     with open(os.path.join(output_dir, "README.md"), 'w') as f:
