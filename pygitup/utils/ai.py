@@ -1,6 +1,7 @@
 import subprocess
 import requests
 import json
+import time
 from .ui import print_info, print_error, print_warning, print_success, console, Panel
 
 def get_git_diff():
@@ -14,13 +15,13 @@ def get_git_diff():
         return None
 
 def call_gemini_api(api_key, prompt, timeout=30):
-    """Centralized caller with 2.0 Flash -> 1.5 Flash fallback and verbose debugging."""
+    """Centralized caller with multi-model fallback, auto-retry for 429, and verbose debugging."""
     if not api_key:
         print_error("Gemini API Key missing. Run Option 14.")
         return None
 
-    # Models and Versions to try
-    models = ["gemini-2.0-flash", "gemini-1.5-flash"]
+    # Comprehensive model list to ensure something works
+    models = ["gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash", "gemini-1.5-pro"]
     api_versions = ["v1beta", "v1"]
     
     last_error = ""
@@ -29,23 +30,37 @@ def call_gemini_api(api_key, prompt, timeout=30):
             url = f"https://generativelanguage.googleapis.com/{version}/models/{model}:generateContent?key={api_key}"
             payload = {"contents": [{"parts": [{"text": prompt}]}]}
             
-            print_info(f"🤖 Attempting AI Request ({model} @ {version})...")
+            # Print attempt info
+            print_info(f"🤖 AI Request: {model} ({version})...")
             
             try:
                 response = requests.post(url, json=payload, timeout=timeout)
+                
+                # Success
                 if response.status_code == 200:
                     data = response.json()
                     return data['candidates'][0]['content']['parts'][0]['text'].strip()
-                else:
-                    last_error = f"[{model}/{version}] HTTP {response.status_code}: {response.text}"
-                    print_warning(f"   ⚠️  Attempt failed: {version} returned {response.status_code}")
-                    continue 
+                
+                # Rate Limited - Auto Retry once
+                elif response.status_code == 429:
+                    print_warning(f"   ⏳ Rate limit hit (429). Retrying in 2s...")
+                    time.sleep(2)
+                    response = requests.post(url, json=payload, timeout=timeout)
+                    if response.status_code == 200:
+                        data = response.json()
+                        return data['candidates'][0]['content']['parts'][0]['text'].strip()
+                
+                # Other errors - Log and continue to next model/version
+                last_error = f"[{model}/{version}] HTTP {response.status_code}: {response.text}"
+                print_warning(f"   ⚠️  Failed ({response.status_code}). Trying next...")
+                continue 
+
             except Exception as e:
                 last_error = f"[{model}/{version}] Connection error: {e}"
                 continue
 
-    print_error(f"❌ AI Engine exhausted all fallbacks.")
-    console.print(Panel(last_error, title="Raw Error Response from Google", border_style="red"))
+    print_error(f"❌ AI Engine failed to find a working model/endpoint.")
+    console.print(Panel(last_error, title="Final Error Response", border_style="red"))
     return None
 
 def generate_ai_commit_message(api_key, diff_text):
@@ -69,7 +84,9 @@ def suggest_todo_fix(api_key, todo_text, context_code):
 
 def generate_ai_readme(api_key, project_name, file_list):
     """Generates professional README using tiered fallback."""
-    prompt = f"Write a professional README.md for '{project_name}' given this file structure:\n{file_list}"
+    # Truncate file list if it's too massive
+    files = file_list[:5000] if len(file_list) > 5000 else file_list
+    prompt = f"Write a professional, comprehensive README.md for the project '{project_name}' based on this file structure:\n{files}"
     return call_gemini_api(api_key, prompt)
 
 def ai_commit_workflow(github_username, github_token, config):
@@ -92,7 +109,7 @@ def ai_commit_workflow(github_username, github_token, config):
             print_warning("No changes detected.")
             return False
 
-    print_info("🤖 AI is analyzing your changes (Priority: 2.0 Flash)...")
+    print_info("🤖 AI is analyzing your changes...")
     message = generate_ai_commit_message(api_key, diff)
     if not message: return False
 
