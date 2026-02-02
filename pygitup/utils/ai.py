@@ -14,13 +14,36 @@ def get_git_diff():
     except subprocess.CalledProcessError:
         return None
 
+def list_available_ai_models(api_key):
+    """Queries the API to list all models available for this key."""
+    if not api_key:
+        print_error("API Key missing.")
+        return
+    
+    print_info("🔍 Querying Google for available models...")
+    for version in ["v1beta", "v1"]:
+        url = f"https://generativelanguage.googleapis.com/{version}/models?key={api_key}"
+        try:
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                models = response.json().get('models', [])
+                print_success(f"Found {len(models)} models via {version}:")
+                for m in models:
+                    if 'generateContent' in m.get('supportedGenerationMethods', []):
+                        name = m.get('name', '').replace('models/', '')
+                        print(f"  - {name} ({m.get('displayName')})")
+            else:
+                print_warning(f"Could not list models via {version}: {response.status_code}")
+        except Exception as e:
+            print_error(f"Diagnostic failed for {version}: {e}")
+
 def call_gemini_api(api_key, prompt, timeout=30):
     """Centralized caller with multi-model fallback, auto-retry, and verbose debugging."""
     if not api_key:
         print_error("Gemini API Key missing. Run Option 14.")
         return None
 
-    # Comprehensive model list including latest stable aliases
+    # Robust model list including latest stable aliases
     models = [
         "gemini-2.0-flash", 
         "gemini-2.0-flash-001",
@@ -67,6 +90,7 @@ def call_gemini_api(api_key, prompt, timeout=30):
 
     print_error(f"❌ AI Engine exhausted all {len(models) * len(api_versions)} fallback combinations.")
     console.print(Panel(last_error, title="Final Raw Error", border_style="red"))
+    print_info("\n💡 TIP: Run Option 32 to see exactly which models your key supports.")
     return None
 
 def generate_ai_commit_message(api_key, diff_text):

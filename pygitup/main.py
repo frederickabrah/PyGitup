@@ -12,7 +12,7 @@ from .github.pull_requests import manage_pull_requests, request_code_review
 from .git.push import smart_push
 from .project.docs import generate_documentation
 from .utils.analytics import generate_analytics
-from .utils.ai import ai_commit_workflow
+from .utils.ai import ai_commit_workflow, list_available_ai_models
 from .git.branch import manage_branches
 from .git.stash import manage_stashes
 from .git.tag import manage_tags
@@ -106,11 +106,11 @@ def main():
                     '27': ("Bulk Repository Management & Health", "bulk-mgmt"),
                     '28': ("Migrate/Mirror Repository from any source", "migrate"),
                     '29': ("Network & Fork Intelligence (OSINT)", "fork-intel"),
-                    '30': ("AI-Powered Semantic Commit", "ai-commit"),
-                    '31': ("Manage Accounts (Switch/Add/List)", "accounts"),
-                    '0': ("Exit PyGitUp", "exit")
-                }
-
+                                    '30': ("AI-Powered Semantic Commit", "ai-commit"),
+                                    '31': ("Manage Accounts (Switch/Add/List)", "accounts"),
+                                    '32': ("AI Diagnostic (List Available Models)", "ai-diagnostic"),
+                                    '0': ("Exit PyGitUp", "exit")
+                                }
                 display_menu(menu_options)
                 max_choice = max([int(k) for k in menu_options.keys() if k.isdigit()])
                 choice = input(f"\n👉 Enter your choice (0-{max_choice}): ")
@@ -196,6 +196,9 @@ def main():
                     print_error("Invalid repository URL.")
             elif mode == "ai-commit":
                 ai_commit_workflow(github_username, github_token, config)
+            elif mode == "ai-diagnostic":
+                ai_key = config["github"].get("ai_api_key")
+                list_available_ai_models(ai_key)
             elif mode == "accounts":
                 print_header("Account & Profile Manager")
                 profiles = list_profiles()
