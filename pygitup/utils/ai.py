@@ -15,16 +15,17 @@ def get_git_diff():
         return None
 
 def call_gemini_api(api_key, prompt, timeout=30):
-    """Centralized caller with multi-model fallback and smart quota management."""
+    """Centralized caller with multi-model fallback, auto-retry, and verbose debugging."""
     if not api_key:
         print_error("Gemini API Key missing. Run Option 14.")
         return None
 
-    # Robust model list
+    # Comprehensive model list including latest stable aliases
     models = [
         "gemini-2.0-flash", 
+        "gemini-2.0-flash-001",
         "gemini-1.5-flash", 
-        "gemini-1.5-flash-8b", 
+        "gemini-1.5-flash-latest",
         "gemini-1.5-pro"
     ]
     api_versions = ["v1beta", "v1"]
@@ -45,23 +46,27 @@ def call_gemini_api(api_key, prompt, timeout=30):
                     try:
                         return data['candidates'][0]['content']['parts'][0]['text'].strip()
                     except (KeyError, IndexError):
-                        last_error = f"Malformed response from {model}"
+                        last_error = f"[{model}] Malformed response body."
+                        print_warning(f"   ⚠️  Bad response structure. Trying next...")
                         continue
 
                 elif response.status_code == 429:
-                    print_warning(f"   ⏳ Rate limit hit for {model}. Jumping to next model...")
-                    break # Break version loop, try next model immediately
+                    print_warning(f"   ⏳ Rate limit hit (429). Cooling down for 3s...")
+                    time.sleep(3)
+                    continue # Try next model/version
                 
                 else:
                     last_error = f"[{model}/{version}] HTTP {response.status_code}: {response.text}"
+                    print_warning(f"   ⚠️  Failed ({response.status_code}).")
                     continue 
 
             except Exception as e:
                 last_error = f"[{model}/{version}] Connection error: {e}"
+                print_warning(f"   ⚠️  Connection failed.")
                 continue
 
-    print_error(f"❌ AI Engine failed to find a working model.")
-    console.print(Panel(last_error, title="Final Error Trace", border_style="red"))
+    print_error(f"❌ AI Engine exhausted all {len(models) * len(api_versions)} fallback combinations.")
+    console.print(Panel(last_error, title="Final Raw Error", border_style="red"))
     return None
 
 def generate_ai_commit_message(api_key, diff_text):
