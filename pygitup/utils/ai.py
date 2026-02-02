@@ -15,13 +15,18 @@ def get_git_diff():
         return None
 
 def call_gemini_api(api_key, prompt, timeout=30):
-    """Centralized caller with multi-model fallback, auto-retry for 429, and verbose debugging."""
+    """Centralized caller with multi-model fallback and smart quota management."""
     if not api_key:
         print_error("Gemini API Key missing. Run Option 14.")
         return None
 
-    # Comprehensive model list to ensure something works
-    models = ["gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash", "gemini-1.5-pro"]
+    # Robust model list
+    models = [
+        "gemini-2.0-flash", 
+        "gemini-1.5-flash", 
+        "gemini-1.5-flash-8b", 
+        "gemini-1.5-pro"
+    ]
     api_versions = ["v1beta", "v1"]
     
     last_error = ""
@@ -30,37 +35,33 @@ def call_gemini_api(api_key, prompt, timeout=30):
             url = f"https://generativelanguage.googleapis.com/{version}/models/{model}:generateContent?key={api_key}"
             payload = {"contents": [{"parts": [{"text": prompt}]}]}
             
-            # Print attempt info
             print_info(f"🤖 AI Request: {model} ({version})...")
             
             try:
                 response = requests.post(url, json=payload, timeout=timeout)
                 
-                # Success
                 if response.status_code == 200:
                     data = response.json()
-                    return data['candidates'][0]['content']['parts'][0]['text'].strip()
-                
-                # Rate Limited - Auto Retry once
-                elif response.status_code == 429:
-                    print_warning(f"   ⏳ Rate limit hit (429). Retrying in 2s...")
-                    time.sleep(2)
-                    response = requests.post(url, json=payload, timeout=timeout)
-                    if response.status_code == 200:
-                        data = response.json()
+                    try:
                         return data['candidates'][0]['content']['parts'][0]['text'].strip()
+                    except (KeyError, IndexError):
+                        last_error = f"Malformed response from {model}"
+                        continue
+
+                elif response.status_code == 429:
+                    print_warning(f"   ⏳ Rate limit hit for {model}. Jumping to next model...")
+                    break # Break version loop, try next model immediately
                 
-                # Other errors - Log and continue to next model/version
-                last_error = f"[{model}/{version}] HTTP {response.status_code}: {response.text}"
-                print_warning(f"   ⚠️  Failed ({response.status_code}). Trying next...")
-                continue 
+                else:
+                    last_error = f"[{model}/{version}] HTTP {response.status_code}: {response.text}"
+                    continue 
 
             except Exception as e:
                 last_error = f"[{model}/{version}] Connection error: {e}"
                 continue
 
-    print_error(f"❌ AI Engine failed to find a working model/endpoint.")
-    console.print(Panel(last_error, title="Final Error Response", border_style="red"))
+    print_error(f"❌ AI Engine failed to find a working model.")
+    console.print(Panel(last_error, title="Final Error Trace", border_style="red"))
     return None
 
 def generate_ai_commit_message(api_key, diff_text):
@@ -84,27 +85,19 @@ def suggest_todo_fix(api_key, todo_text, context_code):
 
 def generate_ai_readme(api_key, project_name, file_list, code_context=""):
     """Uses Gemini to generate a professional README based on structure and code content."""
-    # Truncate file list if it's too massive
     files = file_list[:3000] if len(file_list) > 3000 else file_list
     context = code_context[:7000] if len(code_context) > 7000 else code_context
 
     prompt = f"""
-    Write a professional, high-quality README.md for the project '{project_name}'.
-    
-    PROJECT FILE STRUCTURE:
-    {files}
-    
-    CORE CODE CONTEXT (Entries & Configs):
-    {context}
+    Write a professional README.md for the project '{project_name}'.
+    STRUCTURE: {files}
+    CODE SNIPPETS: {context}
     
     INSTRUCTIONS:
-    1. Use the code context to determine what the project actually DOES.
+    1. Determine what the project actually DOES.
     2. Write a professional introduction and feature list.
-    3. Include REAL installation steps based on the dependencies found in the context (e.g., requirements.txt, setup.py).
-    4. Provide usage examples based on the entry files (e.g., main.py, index.js).
-    5. Format in clean, beautiful Markdown.
-    
-    Do not guess. Use the provided code to be accurate.
+    3. Include REAL installation steps.
+    4. Format in beautiful Markdown.
     """
     return call_gemini_api(api_key, prompt)
 
