@@ -173,7 +173,7 @@ def main():
             elif mode == "webhook":
                 manage_webhooks(args, github_username, github_token)
             elif mode == "actions":
-                manage_actions(args, github_username, github_token)
+                manage_actions(args, github_username, github_token, config)
             elif mode == "pr":
                 manage_pull_requests(args, github_username, github_token)
             elif mode == "audit":
