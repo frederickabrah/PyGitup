@@ -10,6 +10,8 @@ from ..utils.ai import ai_commit_workflow
 from ..github.repo_info import get_detailed_repo_info, get_fork_intelligence
 from ..github.ssh_ops import setup_ssh_infrastructure
 from ..github.actions import manage_actions, setup_cicd_workflow
+from ..utils.analytics import generate_analytics
+from ..utils.security import run_audit
 import os
 
 class FeatureItem(ListItem):
@@ -100,8 +102,12 @@ class PyGitUpTUI(App):
                     FeatureItem("AI Semantic Commit", "ai-commit", "Tools", "Uses Gemini to write professional conventional commits based on your diff."),
                     FeatureItem("OSINT Intelligence", "repo-info", "GitHub", "Deep reconnaissance of repository stats, health, and social metadata."),
                     FeatureItem("Fork Network Recon", "fork-intel", "GitHub", "Analyze community forks for unique code and hidden improvements."),
+                    FeatureItem("Security Audit (SAST)", "audit", "Tools", "Local and Cloud security scan for vulnerabilities and leaks."),
+                    FeatureItem("Analytics Dashboard", "analytics", "Tools", "Predictive growth metrics and contributor impact scoring."),
                     FeatureItem("CI/CD Architect", "cicd", "GitHub", "Automated GitHub Actions generation and live build monitoring."),
+                    FeatureItem("Identity Switcher", "accounts", "Tools", "Swap between Work and Personal GitHub profiles instantly."),
                     FeatureItem("SSH Infrastructure", "ssh-setup", "GitHub", "Auto-generate and sync secure Ed25519 keys with GitHub."),
+                    FeatureItem("AI Diagnostics", "ai-diagnostic", "Tools", "List every AI model available to your current API key."),
                     id="feature-list"
                 ),
                 id="sidebar"
@@ -168,6 +174,13 @@ class PyGitUpTUI(App):
                         get_fork_intelligence(owner, repo, token)
                 elif mode == "ssh-setup":
                     setup_ssh_infrastructure(config, token)
+                elif mode == "audit":
+                    run_audit(user, None, token)
+                elif mode == "analytics":
+                    generate_analytics(user, token, config)
+                elif mode == "ai-diagnostic":
+                    from ..utils.ai import list_available_ai_models
+                    list_available_ai_models(config["github"].get("ai_api_key"))
                 elif mode == "cicd":
                     setup_cicd_workflow(user, token, None, config)
                 
