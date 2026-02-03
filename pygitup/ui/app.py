@@ -34,7 +34,7 @@ class PyGitUpTUI(App):
     ListItem { padding: 1 1; border-bottom: hkey #30363d; }
     ListItem:hover { background: #1f6feb; }
     ListView:focus > ListItem.--highlight { background: #238636; color: white; }
-    .title { color: #58a6ff; text-style: bold; margin-bottom: 1; font-size: 150%; }
+    .title { color: #58a6ff; text-style: bold; margin-bottom: 1; }
     Markdown, DataTable { height: 100%; border: solid #30363d; padding: 1; background: #0d1117; }
     .btn-row { margin-top: 1; height: 3; }
     Button { margin-right: 2; }
