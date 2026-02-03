@@ -258,6 +258,7 @@ def main():
                     '43': ("✂️  Purge Sensitive String from History", "purge-string"),
                     '44': ("📝 Interactive History Editor (Edit/Delete Commits)", "edit-history"),
                     '45': ("📖 Remediation Help & Guide", "remediation-help"),
+                    'M': ("📘 View Full User Manual", "manual"),
                     'H': ("❓ Show Help for Feature", "help"),
                     '0': ("Exit PyGitUp", "exit")
                 }
@@ -540,6 +541,22 @@ def main():
             elif mode == "remediation-help":
                 from .utils.remediation import show_remediation_help
                 show_remediation_help()
+            elif mode == "manual":
+                print_header("PyGitUp User Manual")
+                manual_path = os.path.join(os.path.dirname(__file__), "..", "..", "USER_MANUAL.md")
+                if os.path.exists(manual_path):
+                    print_info(f"Opening manual at: {manual_path}")
+                    print("\n📘 Full manual available at: USER_MANUAL.md")
+                    print("\nQuick Reference:")
+                    print("  • Core: Options 1-4 (Upload/Create)")
+                    print("  • Git: Options 15-18 (Branch/Stash/Tag)")
+                    print("  • GitHub: Options 19-22, 24-29")
+                    print("  • Security: Options 23, 35-39, 41-45")
+                    print("  • AI: Options 30-32, 40")
+                    print("\n💡 Tip: Use Option H for feature-specific help")
+                    print("📖 Full manual: USER_MANUAL.md")
+                else:
+                    print_error("Manual not found. See: https://github.com/frederickabrah/PyGitUp/wiki")
             elif mode == "help":
                 # Show help for a specific feature
                 print_header("Feature Help")
