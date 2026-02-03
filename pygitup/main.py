@@ -107,12 +107,14 @@ def main():
                     '27': ("Bulk Repository Management & Health", "bulk-mgmt"),
                     '28': ("Migrate/Mirror Repository from any source", "migrate"),
                     '29': ("Network & Fork Intelligence (OSINT)", "fork-intel"),
-                                    '30': ("AI-Powered Semantic Commit", "ai-commit"),
-                                                    '31': ("Manage Accounts (Switch/Add/List)", "accounts"),
-                                                    '32': ("AI Diagnostic (List Available Models)", "ai-diagnostic"),
-                                                    '33': ("SSH Key Infrastructure Manager", "ssh-setup"),
-                                                    '0': ("Exit PyGitUp", "exit")
-                                                }                display_menu(menu_options)
+                    '30': ("AI-Powered Semantic Commit", "ai-commit"),
+                    '31': ("Manage Accounts (Switch/Add/List)", "accounts"),
+                    '32': ("AI Diagnostic (List Available Models)", "ai-diagnostic"),
+                    '33': ("SSH Key Infrastructure Manager", "ssh-setup"),
+                    '0': ("Exit PyGitUp", "exit")
+                }
+
+                display_menu(menu_options)
                 max_choice = max([int(k) for k in menu_options.keys() if k.isdigit()])
                 choice = input(f"\n👉 Enter your choice (0-{max_choice}): ")
                 
@@ -155,7 +157,6 @@ def main():
                 generate_analytics(github_username, github_token, config, args)
             elif mode == "configure":
                 configuration_wizard()
-                # Reload config after wizard
                 config = load_config(args.config)
                 github_username = get_github_username(config)
                 github_token = get_github_token(config)
@@ -207,25 +208,21 @@ def main():
                 profiles = list_profiles()
                 active_path = get_active_profile_path()
                 active_name = os.path.basename(active_path).replace(".yaml", "")
-
                 console.print(f"Current Active Profile: [bold green]{active_name}[/bold green]")
                 print("\nAvailable Profiles:")
                 for p in profiles:
                     marker = "➜ " if p == active_name else "  "
                     print(f"{marker}{p}")
-                
-                console.print("\n[bold]Options:[/bold]")
+                print("\n[bold]Options:[/bold]")
                 print("1: Switch Profile")
                 print("2: Add New Account")
                 print("3: Back")
-                
                 acc_choice = input("\n👉 Choice: ")
                 if acc_choice == '1':
                     target = input("Enter profile name to switch to: ")
                     success, msg = set_active_profile(target)
                     if success:
                         print_success(msg)
-                        # Reload everything
                         config = load_config(args.config)
                         github_username = get_github_username(config)
                         github_token = get_github_token(config)
@@ -241,13 +238,9 @@ def main():
                 if not is_interactive: sys.exit(1)
 
             print_success("Operation complete.")
-            
-            # If we were in CLI mode, exit loop after one operation
             if not is_interactive:
                 break
-            
             input("\n⌨️  Press Enter to return to the menu...")
-            # Clear screen for next iteration
             os.system('cls' if os.name == 'nt' else 'clear')
             show_banner()
 
