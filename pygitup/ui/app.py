@@ -5,6 +5,7 @@ from textual.binding import Binding
 from .. import __version__
 from ..core.config import load_config, get_github_username, get_github_token, get_active_profile_path
 from ..project.project_ops import upload_project_directory
+from ..project.templates import create_project_from_template
 from ..utils.ai import ai_commit_workflow
 from ..github.repo_info import get_detailed_repo_info, get_fork_intelligence
 from ..github.ssh_ops import setup_ssh_infrastructure
@@ -95,6 +96,7 @@ class PyGitUpTUI(App):
                 Label(f" PROFILE: {active_profile} ", classes="category-header"),
                 ListView(
                     FeatureItem("Project Upload", "project", "Core", "Upload whole directories to GitHub with security pre-scans."),
+                    FeatureItem("Template Marketplace", "template", "Core", "Pull 'God Tier' architectures (FastAPI, Node, etc.) instantly."),
                     FeatureItem("AI Semantic Commit", "ai-commit", "Tools", "Uses Gemini to write professional conventional commits based on your diff."),
                     FeatureItem("OSINT Intelligence", "repo-info", "GitHub", "Deep reconnaissance of repository stats, health, and social metadata."),
                     FeatureItem("Fork Network Recon", "fork-intel", "GitHub", "Analyze community forks for unique code and hidden improvements."),
@@ -150,6 +152,8 @@ class PyGitUpTUI(App):
                 
                 if mode == "project":
                     upload_project_directory(user, token, config)
+                elif mode == "template":
+                    create_project_from_template(user, token, config)
                 elif mode == "ai-commit":
                     ai_commit_workflow(user, token, config)
                 elif mode == "repo-info":
