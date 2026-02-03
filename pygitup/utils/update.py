@@ -1,82 +1,81 @@
+
 import requests
 import subprocess
 import os
 import sys
+import re
 from .. import __version__
 from .ui import print_info, print_success, print_error, print_warning
 
-# Use the case-sensitive URL as reported by GitHub
-GITHUB_RAW_VERSION_URL = "https://raw.githubusercontent.com/frederickabrah/PyGitup/main/pygitup/__init__.py"
+# CAUTION: Case-sensitive URL
+GITHUB_RAW_VERSION_URL = "https://raw.githubusercontent.com/frederickabrah/PyGitUp/main/pygitup/__init__.py"
 
 def is_newer(latest, current):
-    """Simple semantic version comparison."""
+    """Robust semantic version comparison."""
     try:
-        l_parts = [int(x) for x in latest.split(".")]
-        c_parts = [int(x) for x in current.split(".")]
-        # Compare parts (1.5.0 > 1.4.0)
-        for l, c in zip(l_parts, c_parts):
+        # Extract digits only to be safe
+        l_parts = [int(re.sub(r'\D', '', x)) for x in latest.split(".")]
+        c_parts = [int(re.sub(r'\D', '', x)) for x in current.split(".")]
+        
+        for i in range(max(len(l_parts), len(c_parts))):
+            l = l_parts[i] if i < len(l_parts) else 0
+            c = c_parts[i] if i < len(c_parts) else 0
             if l > c: return True
             if l < c: return False
-        return len(l_parts) > len(c_parts)
+        return False
     except Exception:
         return False
 
 def check_for_updates():
-    """Checks GitHub for a newer version of PyGitUp by reading the raw source."""
+    """Checks GitHub for a newer version using robust Regex parsing."""
     try:
-        # We check the raw __init__.py because it's the most "real-time" source
-        response = requests.get(GITHUB_RAW_VERSION_URL, timeout=3)
+        response = requests.get(GITHUB_RAW_VERSION_URL, timeout=5)
         if response.status_code == 200:
             content = response.text
-            latest_version = "0.0.0"
-            for line in content.splitlines():
-                if "__version__" in line:
-                    latest_version = line.split("=")[1].strip().strip('"').strip("'")
-                    break
-            
-            if is_newer(latest_version, __version__):
-                print_warning(f"🚀 A new update is available: v{latest_version} (Current: v{__version__})")
-                confirm = input("Would you like to auto-update now? (y/n): ").lower()
-                if confirm == 'y':
-                    perform_update()
+            # Regex to find __version__ = "X.Y.Z" regardless of spaces or comments
+            match = re.search(r'__version__\s*=\s*["\']([^"\\]+)["\']', content)
+            if match:
+                latest_version = match.group(1)
+                
+                if is_newer(latest_version, __version__):
+                    print_warning(f"🚀 A new update is available: v{latest_version} (Current: v{__version__})")
+                    confirm = input("Would you like to auto-update now? (y/n): ").lower()
+                    if confirm == 'y':
+                        perform_update()
     except Exception:
-        # Fail silently to not disturb the user's workflow if offline
         pass
 
 def perform_update():
-    """Executes a safe update by finding the package source and pulling."""
-    print_info("Initiating self-update sequence...")
+    """Executes a deep full-system update."""
+    print_info("Initiating Deep Update sequence...")
     
-    # 1. Find the root of the PyGitUp installation
-    # pygitup/utils/update.py -> pygitup/utils -> pygitup -> PyGitUp (root)
     try:
         current_file_path = os.path.abspath(__file__)
         package_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file_path)))
-        
         original_cwd = os.getcwd()
         
         if os.path.exists(os.path.join(package_root, ".git")):
-            print_info(f"Updating source at: {package_root}")
+            print_info(f"Synchronizing source at: {package_root}")
             os.chdir(package_root)
             
-            # 2. Perform the pull
+            # 1. Pull latest code
             result = subprocess.run(["git", "pull", "origin", "main"], capture_output=True, text=True)
             
             if result.returncode == 0:
-                print_success("Code successfully pulled from GitHub.")
+                print_success("Code successfully synchronized.")
                 
-                # 3. Deep Reinstall (Update dependencies and entry points)
-                print_info("Updating environment and dependencies...")
+                # 2. Update dependencies and entry points
+                print_info("Updating system environment...")
                 subprocess.run([sys.executable, "-m", "pip", "install", "-e", "."], capture_output=True)
                 
-                print_success("PyGitUp updated to the latest version!")
-                print_info("Please restart the tool to apply changes.")
+                print_success("PyGitUp v2.0.1 is now installed!")
+                print_info("Please restart the tool to enter God Mode.")
                 os.chdir(original_cwd)
                 sys.exit(0)
             else:
-                print_error(f"Git Pull Failed: {result.stderr}")
+                print_error(f"Sync Failed: {result.stderr}")
         else:
-            print_error("This installation is not managed by Git. Please update manually via 'pip install --upgrade .'")
+            print_error("This installation is not managed by Git. Update manually via 'pip install --upgrade .'")
             
         os.chdir(original_cwd)
     except Exception as e:
