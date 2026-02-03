@@ -118,35 +118,30 @@ def generate_ai_readme(api_key, project_name, file_list, code_context=""):
     return call_gemini_api(api_key, prompt)
 
 def generate_ai_workflow(api_key, project_name, file_list, code_context=""):
-    """Uses Gemini to architect a custom CI/CD pipeline based on project analysis."""
-    context = code_context[:7000] if len(code_context) > 7000 else code_context
+    # ... (existing code)
+    return call_gemini_api(api_key, prompt)
+
+def analyze_failed_log(api_key, log_text):
+    """Uses Gemini to debug a failed CI/CD build log and suggest a fix."""
+    if not api_key: return None
+    
+    # Take the last 5000 chars of the log (usually where the error is)
+    snippet = log_text[-5000:] if len(log_text) > 5000 else log_text
     
     prompt = f"""
-    Architect a professional GitHub Actions CI/CD pipeline for the project '{project_name}'.
+    You are an expert DevOps and Debugging Assistant.
+    The following is a failed GitHub Actions build log snippet:
     
-    PROJECT STRUCTURE:
-    {file_list}
+    {snippet}
     
-    CORE CODE CONTEXT:
-    {context}
+    TASKS:
+    1. Identify the EXACT error that caused the build to fail.
+    2. Explain WHY it happened in plain English.
+    3. Suggest the code fix or command needed to resolve it.
     
-    RULES:
-    1. Identify the primary language and framework.
-    2. Write a complete, valid YAML for '.github/workflows/main.yml'.
-    3. Include steps for: Dependency installation, Linting (use the best tool for the language), and Testing.
-    4. If you see specific requirements (e.g. database, docker), include the necessary services.
-    5. Output ONLY the raw YAML code. No explanations.
+    Format as beautiful Markdown.
     """
-    
-    msg = call_gemini_api(api_key, prompt)
-    if msg and msg.startswith("```"):
-        # Strip markdown code blocks
-        lines = msg.splitlines()
-        if "yaml" in lines[0] or "yml" in lines[0]:
-            msg = "\n".join(lines[1:-1])
-        else:
-            msg = "\n".join(lines[1:-1])
-    return msg
+    return call_gemini_api(api_key, prompt)
 
 def ai_commit_workflow(github_username, github_token, config):
     """Orchestrates the AI commit process with auto-staging support."""
