@@ -156,3 +156,37 @@ def scan_directory_for_sensitive_files(directory):
                 f.write(f"{os.path.relpath(item, directory)}\n")
         return True
     return choice == "2"
+
+def generate_ssh_key(email):
+    """Generates a secure Ed25519 SSH key if one does not exist."""
+    ssh_dir = os.path.expanduser("~/.ssh")
+    key_path = os.path.join(ssh_dir, "id_ed25519")
+    pub_key_path = f"{key_path}.pub"
+
+    if os.path.exists(key_path):
+        print_info("Existing Ed25519 key found.")
+        try:
+            with open(pub_key_path, 'r') as f:
+                return f.read().strip(), key_path
+        except FileNotFoundError:
+            print_error("Private key exists but public key is missing.")
+            return None, None
+
+    print_info("Generating new secure Ed25519 SSH key...")
+    os.makedirs(ssh_dir, exist_ok=True)
+    
+    try:
+        # Generate key with no passphrase for automation convenience (standard for dev tools)
+        subprocess.run(
+            ["ssh-keygen", "-t", "ed25519", "-C", email, "-f", key_path, "-N", ""],
+            check=True,
+            capture_output=True
+        )
+        print_success(f"Key generated at {key_path}")
+        
+        with open(pub_key_path, 'r') as f:
+            return f.read().strip(), key_path
+            
+    except subprocess.CalledProcessError as e:
+        print_error(f"SSH Key generation failed: {e}")
+        return None, None

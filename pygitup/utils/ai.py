@@ -43,12 +43,12 @@ def call_gemini_api(api_key, prompt, timeout=30):
         print_error("Gemini API Key missing. Run Option 14.")
         return None
 
-    # Robust model list including latest stable aliases
+    # Robust model list based on diagnostic results
     models = [
+        "gemini-2.5-flash",
+        "gemini-2.5-pro",
         "gemini-2.0-flash", 
-        "gemini-2.0-flash-001",
-        "gemini-1.5-flash", 
-        "gemini-1.5-flash-latest",
+        "gemini-1.5-flash",
         "gemini-1.5-pro"
     ]
     api_versions = ["v1beta", "v1"]
