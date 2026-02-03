@@ -24,6 +24,7 @@ from .utils.security import run_audit
 from .github.repo import manage_repo_visibility, delete_repository
 from .github.repo_info import get_detailed_repo_info, get_fork_intelligence, parse_github_url
 from .github.ssh_ops import setup_ssh_infrastructure
+from .ui.app import run_tui
 from .utils.banner import show_banner
 from .utils.ui import display_menu, print_error, print_success, print_info, console
 from .utils.update import check_for_updates
@@ -109,11 +110,11 @@ def main():
                     '29': ("Network & Fork Intelligence (OSINT)", "fork-intel"),
                     '30': ("AI-Powered Semantic Commit", "ai-commit"),
                     '31': ("Manage Accounts (Switch/Add/List)", "accounts"),
-                    '32': ("AI Diagnostic (List Available Models)", "ai-diagnostic"),
-                    '33': ("SSH Key Infrastructure Manager", "ssh-setup"),
-                    '0': ("Exit PyGitUp", "exit")
-                }
-
+                                    '32': ("AI Diagnostic (List Available Models)", "ai-diagnostic"),
+                                    '33': ("SSH Key Infrastructure Manager", "ssh-setup"),
+                                    '34': ("Launch TUI Dashboard (BETA)", "tui"),
+                                    '0': ("Exit PyGitUp", "exit")
+                                }
                 display_menu(menu_options)
                 max_choice = max([int(k) for k in menu_options.keys() if k.isdigit()])
                 choice = input(f"\n👉 Enter your choice (0-{max_choice}): ")
@@ -203,6 +204,8 @@ def main():
                 list_available_ai_models(ai_key)
             elif mode == "ssh-setup":
                 setup_ssh_infrastructure(config, github_token)
+            elif mode == "tui":
+                run_tui()
             elif mode == "accounts":
                 print_header("Account & Profile Manager")
                 profiles = list_profiles()
