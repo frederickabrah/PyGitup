@@ -48,7 +48,7 @@ def display_menu(options):
     table.add_column("Category", style="dim")
 
     categories = {
-        "Core": ["project", "file", "batch", "template", "migrate"],
+        "Core": ["project", "file", "batch", "template", "migrate", "ssh-setup"],
         "Git": ["branch", "stash", "tag", "cherry-pick", "smart-push"],
         "GitHub": ["release", "multi-repo", "request-review", "gist", "webhook", "actions", "pr", "visibility", "delete-repo", "repo-info", "bulk-mgmt", "fork-intel"],
         "Tools": ["scan-todos", "offline-queue", "process-queue", "generate-docs", "analytics", "audit", "configure", "ai-commit", "accounts", "ai-diagnostic"]

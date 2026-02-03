@@ -179,6 +179,15 @@ def update_repo_visibility(username, repo_name, token, private):
     data = {"private": private}
     return github_request("PATCH", url, token, json=data)
 
+def upload_ssh_key(token, title, key):
+    """Upload a new SSH public key to the user's GitHub account."""
+    url = "https://api.github.com/user/keys"
+    data = {
+        "title": title,
+        "key": key
+    }
+    return github_request("POST", url, token, json=data)
+
 def delete_repo_api(username, repo_name, token):
     """Delete a GitHub repository."""
     url = f"https://api.github.com/repos/{username}/{repo_name}"
