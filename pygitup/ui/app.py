@@ -213,33 +213,99 @@ class PyGitUpTUI(App):
 
 
 
-    def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
-
-        if event.item:
-
-            item = event.item
-
-            self.query_one("#feature-title").update(f"🚀 {item.feature_name}")
-
-            self.query_one("#feature-desc").update(f"{item.description}\n\n[bold white]Press ENTER to launch.[/bold white]")
+        def on_mount(self) -> None:
 
 
 
-    def action_refresh(self) -> None:
-
-        self.notify("System Status: Online 🟢")
+            self.title = self.TITLE
 
 
 
-    def action_select(self) -> None:
+            # Auto-focus the list so keys work immediately
 
-        list_view = self.query_one("#feature-list", ListView)
 
-        if list_view.highlighted_child:
 
-            item = list_view.highlighted_child
+            self.query_one("#feature-list").focus()
 
-            self.launch_feature(item.mode)
+
+
+    
+
+
+
+        def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
+
+
+
+            if event.item:
+
+
+
+                item = event.item
+
+
+
+                self.query_one("#feature-title").update(f"🚀 {item.feature_name}")
+
+
+
+                self.query_one("#feature-desc").update(f"{item.description}\n\n[bold white]Press ENTER to launch.[/bold white]")
+
+
+
+    
+
+
+
+        def on_list_view_selected(self, event: ListView.Selected) -> None:
+
+
+
+            """Handles both Enter key and Mouse Click selection."""
+
+
+
+            if event.item:
+
+
+
+                self.launch_feature(event.item.mode)
+
+
+
+    
+
+
+
+        def action_refresh(self) -> None:
+
+
+
+            self.notify("System Status: Online 🟢")
+
+
+
+    
+
+
+
+        def action_select(self) -> None:
+
+
+
+            # Fallback manual trigger if needed
+
+
+
+            list_view = self.query_one("#feature-list", ListView)
+
+
+
+            if list_view.highlighted_child:
+
+
+
+                self.launch_feature(list_view.highlighted_child.mode)
 
 
 
