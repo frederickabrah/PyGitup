@@ -1,25 +1,31 @@
+
 import subprocess
 import os
 import fnmatch
 import math
+import re
 from ..github.api import get_dependabot_alerts, get_secret_scanning_alerts
-from ..utils.ui import print_success, print_error, print_warning, print_info, print_header
+from ..utils.ui import print_success, print_error, print_warning, print_info, print_header, Table, box, console
 
 # List of patterns that are usually sensitive or too heavy to upload
 SENSITIVE_PATTERNS = [
-    # Secrets and Configs
     "*.env", ".env.*",
     "*.pem", "*.key", "id_rsa", "id_dsa",
     "token.json", "credentials.json", "secrets.json",
     "pygitup.yaml",
-    
-    # Heavy / Build Artifacts
     "node_modules",
     "venv", ".venv", "env",
     "__pycache__", "*.pyc",
     "dist", "build", "*.egg-info",
     ".git", ".idea", ".vscode"
 ]
+
+SAST_RULES = {
+    "SQL Injection": [r"execute\(.*%.*\)", r"execute\(.*format\(.*", r"execute\(.*f\".*\""],
+    "Command Injection": [r"os\.system\(", r"subprocess\.run\(.*shell=True", r"eval\("],
+    "Insecure Crypto": [r"hashlib\.md5\(", r"hashlib\.sha1\("],
+    "Hardcoded Secret": [r"password\s*=\s*['\"] સંપર્ક ['\"]", r"secret\s*=\s*['\"] સંપર્ક ['\"]", r"api_key\s*=\s*['\"] સંપર્ક ['\"]"]
+}
 
 def calculate_entropy(data):
     """Calculates the Shannon entropy of a string."""
@@ -32,12 +38,56 @@ def calculate_entropy(data):
             entropy += - p_x * math.log(p_x, 2)
     return entropy
 
-def run_audit(github_username=None, repo_name=None, github_token=None):
-    """Run a security audit on the project dependencies."""
-    print_header("Security Audit")
+def run_local_sast_scan(directory):
+    """Scans code files for dangerous coding patterns (SAST)."""
+    print_info(f"Initiating local SAST scan in {directory}...")
+    vulnerabilities = []
     
-    # Local pip-audit
-    print_info("Running local pip-audit on current environment...")
+    for root, _, files in os.walk(directory):
+        for file in files:
+            if file.endswith((".py", ".js", ".ts", ".php")):
+                path = os.path.join(root, file)
+                try:
+                    with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read()
+                        for category, patterns in SAST_RULES.items():
+                            for pattern in patterns:
+                                matches = re.finditer(pattern, content)
+                                for match in matches:
+                                    line_num = content.count('\n', 0, match.start()) + 1
+                                    vulnerabilities.append({
+                                        "file": path,
+                                        "line": line_num,
+                                        "type": category,
+                                        "code": match.group(0).strip()
+                                    })
+                except Exception:
+                    pass
+    
+    if vulnerabilities:
+        print_error(f"ALERT: {len(vulnerabilities)} potential security vulnerabilities found!")
+        table = Table(title="SAST Security Findings", box=box.ROUNDED)
+        table.add_column("Location", style="cyan")
+        table.add_column("Threat", style="bold red")
+        table.add_column("Snippet", style="dim")
+        
+        for v in vulnerabilities[:15]: # Display top 15
+            table.add_row(f"{os.path.basename(v['file'])}:{v['line']}", v['type'], v['code'])
+        console.print(table)
+        return vulnerabilities
+    
+    print_success("Local SAST scan passed. No dangerous patterns detected.")
+    return []
+
+def run_audit(github_username=None, repo_name=None, github_token=None):
+    """Run a comprehensive security audit (Local SAST + Remote Scan)."""
+    print_header("Global Security Intelligence Audit")
+    
+    # 1. Local SAST
+    run_local_sast_scan(".")
+    
+    # 2. Local pip-audit
+    print_info("\nChecking dependencies for known vulnerabilities...")
     try:
         result = subprocess.run(["pip-audit"], capture_output=True, text=True)
         if result.returncode == 0:
@@ -46,9 +96,9 @@ def run_audit(github_username=None, repo_name=None, github_token=None):
             print_warning("Local vulnerabilities detected:")
             print(result.stdout)
     except FileNotFoundError:
-        print_warning("'pip-audit' not found. Skipping local scan.")
+        print_warning("'pip-audit' not found. Skipping local dependency scan.")
 
-    # Remote GitHub Security scan if context provided
+    # 3. Remote GitHub Security scan
     if github_username and repo_name and github_token:
         run_advanced_security_scan(github_username, repo_name, github_token)
 
@@ -89,8 +139,6 @@ def run_advanced_security_scan(username, repo_name, token):
 def check_is_sensitive(file_path):
     """Checks if a file path matches any sensitive patterns or has high entropy contents."""
     name = os.path.basename(file_path)
-    
-    # 1. Filename Pattern Check
     gitignore_patterns = []
     if os.path.exists(".gitignore"):
         with open(".gitignore", "r") as f:
@@ -101,7 +149,6 @@ def check_is_sensitive(file_path):
         if fnmatch.fnmatch(name, pattern) or fnmatch.fnmatch(file_path, pattern):
             return True
 
-    # 2. Sophisticated Content Analysis (High Entropy Detection)
     if os.path.isfile(file_path) and os.path.getsize(file_path) < 1024 * 500:
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -113,7 +160,6 @@ def check_is_sensitive(file_path):
                             return True
         except Exception:
             pass
-
     return False
 
 def audit_files_and_prompt(files):
@@ -176,17 +222,14 @@ def generate_ssh_key(email):
     os.makedirs(ssh_dir, exist_ok=True)
     
     try:
-        # Generate key with no passphrase for automation convenience (standard for dev tools)
         subprocess.run(
             ["ssh-keygen", "-t", "ed25519", "-C", email, "-f", key_path, "-N", ""],
             check=True,
             capture_output=True
         )
         print_success(f"Key generated at {key_path}")
-        
         with open(pub_key_path, 'r') as f:
             return f.read().strip(), key_path
-            
     except subprocess.CalledProcessError as e:
         print_error(f"SSH Key generation failed: {e}")
         return None, None
