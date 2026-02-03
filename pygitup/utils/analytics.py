@@ -1,10 +1,28 @@
-
 import json
 import csv
 import os
+import math
 from datetime import datetime, timedelta
-from ..github.api import get_contributors, get_issues, github_request
+from ..github.api import get_contributors, get_issues, github_request, get_pull_requests
 from .ui import print_success, print_error, print_info, print_header, Table, box, console
+
+def calculate_health_score(stars, forks, open_issues, closed_issues):
+    """Calculates a 0-100 health score based on engagement and maintenance."""
+    if stars == 0: return 50 # Baseline
+    
+    # 1. Maintenance Ratio (Issues closed vs total)
+    total_issues = open_issues + closed_issues
+    maintenance_factor = (closed_issues / total_issues * 40) if total_issues > 0 else 20
+    
+    # 2. Engagement Factor (Forks to Stars ratio)
+    # Higher fork-to-star ratio usually means a more 'useful' tool
+    engagement_factor = min((forks / (stars + 1)) * 100, 40)
+    
+    # 3. Popularity Bonus
+    popularity_factor = min(math.log10(stars + 1) * 10, 20)
+    
+    score = int(maintenance_factor + engagement_factor + popularity_factor + 10)
+    return max(0, min(100, score))
 
 def calculate_resolution_time(issues):
     """Calculates average time to close an issue in hours."""
@@ -21,18 +39,26 @@ def calculate_resolution_time(issues):
         
     return round(total_hours / len(closed_issues), 1)
 
-def predict_growth(current_count, created_at_str):
-    """Simple linear projection for repository growth."""
+def predict_growth_v2(current_stars, created_at_str, forks):
+    """Trend-based growth prediction factoring in velocity and viral potential."""
     try:
         created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
         days_old = (datetime.now(created_at.tzinfo) - created_at).days
-        if days_old <= 0: return current_count
+        if days_old <= 0: return current_stars
         
-        growth_rate = current_count / days_old
-        prediction_90_days = int(current_count + (growth_rate * 90))
-        return prediction_90_days
+        # Velocity Calculation
+        base_rate = current_stars / days_old
+        
+        # Multipliers
+        fork_multiplier = 1 + (forks / (current_stars + 1))
+        # As projects get older, growth usually accelerates or decays. 
+        # We assume a slight 'Compound Interest' for healthy repos.
+        acceleration = 1.1 if base_rate > 0.1 else 1.0
+        
+        prediction_90_days = int(current_stars + (base_rate * 90 * fork_multiplier * acceleration))
+        return max(current_stars, prediction_90_days)
     except Exception:
-        return current_count
+        return current_stars
 
 def export_report(repo_name, data, format='json'):
     """Exports analytics data to a file."""
@@ -52,70 +78,88 @@ def export_report(repo_name, data, format='json'):
         print_error(f"Export failed: {e}")
 
 def generate_analytics(github_username, github_token, config, args=None):
-    """Advanced Repository Intelligence & Predictive Analytics."""
-    print_header("Advanced Analytics & Reporting")
+    """Next-Gen Repository Intelligence & Predictive Analytics."""
+    print_header("Sophisticated Analytics & Reporting")
     
     if args and args.repo:
         repo_name = args.repo
     else:
         repo_name = input("Enter repository name: ")
 
-    print_info(f"Analyzing {repo_name}...")
+    print_info(f"Crunching deep data for {repo_name}...")
     report_data = {"repo_name": repo_name, "timestamp": datetime.now().isoformat()}
 
     try:
-        # 1. Fetch Core Data
+        # 1. Fetch Comprehensive Data
         repo_resp = github_request("GET", f"https://api.github.com/repos/{github_username}/{repo_name}", github_token)
         if repo_resp.status_code != 200:
-            print_error(f"Failed to fetch repo data: {repo_resp.status_code}")
+            print_error(f"Access denied: {repo_resp.status_code}")
             return
         
         repo_data = repo_resp.json()
         stars = repo_data.get('stargazers_count', 0)
-        
-        # 2. Predictive Growth
-        predicted_stars = predict_growth(stars, repo_data['created_at'])
-        report_data["current_stars"] = stars
-        report_data["predicted_stars_90d"] = predicted_stars
+        forks = repo_data.get('forks_count', 0)
+        open_issues_count = repo_data.get('open_issues_count', 0)
 
-        # 3. Contributor Metrics
-        contrib_resp = get_contributors(github_username, repo_name, github_token)
-        if contrib_resp.status_code == 200:
-            contributors = contrib_resp.json()
-            report_data["contributor_count"] = len(contributors)
-            
-            # Weighted Impact Table
-            table = Table(title="Contributor Performance Metrics", box=box.DOUBLE_EDGE)
-            table.add_column("User", style="cyan")
-            table.add_column("Impact Score", justify="right", style="green")
-            
-            for c in contributors[:5]:
-                # Impact = Contributions * 1.5 (Advanced weighting logic)
-                impact_score = int(c['contributions'] * 1.5)
-                table.add_row(c['login'], str(impact_score))
-            console.print(table)
-
-        # 4. Issue Resolution Analytics
+        # 2. Issue Lifecycle Analysis
         issue_resp = get_issues(github_username, repo_name, github_token, state='all')
-        if issue_resp.status_code == 200:
-            issues = issue_resp.json()
-            avg_res_hours = calculate_resolution_time(issues)
-            report_data["avg_resolution_hours"] = avg_res_hours
-            
-            res_table = Table(title="Predictive Maintenance", box=box.SIMPLE)
-            res_table.add_row("Avg Resolution Time", f"{avg_res_hours} Hours")
-            res_table.add_row("Growth Projection (90d)", f"{predicted_stars} Stars")
-            console.print(res_table)
+        issues = issue_resp.json() if issue_resp.status_code == 200 else []
+        closed_issues_count = len([i for i in issues if i['state'] == 'closed'])
+        avg_res_hours = calculate_resolution_time(issues)
 
-        # 5. Dashboard Summary
-        print_info(f"\n[bold]Summary for {repo_name}:[/bold]")
-        print(f"🌟 Stars: {stars} -> Predicted: {predicted_stars}")
-        print(f"⏱️  Avg Fix Time: {avg_res_hours} hrs")
+        # 3. Predictive Modeling (v2)
+        predicted_stars = predict_growth_v2(stars, repo_data['created_at'], forks)
+        health_score = calculate_health_score(stars, forks, open_issues_count, closed_issues_count)
 
-        # 6. Export Prompt
-        export = input("\n💾 Export report? (json/csv/n): ").lower()
+        # 4. Contributor Impact Analysis
+        contrib_resp = get_contributors(github_username, repo_name, github_token)
+        contributors = contrib_resp.json() if contrib_resp.status_code == 200 else []
+        
+        # UI Display: Contributor Metrics
+        table = Table(title="Contributor Impact Index", box=box.HEAVY_EDGE, header_style="bold magenta")
+        table.add_column("Engineer", style="cyan")
+        table.add_column("Impact Score", justify="right", style="green")
+        table.add_column("Status", justify="center")
+
+        for c in contributors[:5]:
+            # Impact = Contributions + (Weighted activity)
+            impact = int(c['contributions'] * 1.8)
+            status = "🏆 Lead" if impact > 100 else "🛠️ Active" if impact > 50 else "🌱 Contrib"
+            table.add_row(c['login'], str(impact), status)
+        
+        console.print(table)
+
+        # UI Display: Predictive Maintenance
+        res_table = Table(title="Intelligence & Projections", box=box.ROUNDED)
+        res_table.add_column("Metric", style="white")
+        res_table.add_column("Value", style="bold yellow")
+        
+        res_table.add_row("Repository Health Score", f"{health_score}/100")
+        res_table.add_row("Avg Issue Resolution", f"{avg_res_hours} hrs")
+        res_table.add_row("90-Day Star Projection", f"{predicted_stars} 🌟")
+        res_table.add_row("Open/Closed Issue Ratio", f"{open_issues_count}/{closed_issues_count}")
+        
+        console.print(res_table)
+
+        # Final Summary Intelligence
+        health_color = "green" if health_score > 70 else "yellow" if health_score > 40 else "red"
+        print_info(f"\n[bold]Intelligence Summary:[/bold]")
+        console.print(f"Overall Health: [{health_color}]{health_score}%[/{health_color}]")
+        console.print(f"Projected Growth: {stars} ➜ {predicted_stars} Stars")
+
+        # Update Report Data
+        report_data.update({
+            "health_score": health_score,
+            "avg_resolution_hours": avg_res_hours,
+            "predicted_stars": predicted_stars,
+            "stars": stars,
+            "forks": forks
+        })
+
+        # Export Prompt
+        export = input("\n💾 Export detailed report? (json/csv/n): ").lower()
         if export in ['json', 'csv']:
             export_report(repo_name, report_data, export)
 
     except Exception as e:
-        print_error(f"Analytics engine failure: {e}")
+        print_error(f"Intelligence Engine failure: {e}")
