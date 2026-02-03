@@ -110,11 +110,12 @@ def main():
                     '29': ("Network & Fork Intelligence (OSINT)", "fork-intel"),
                     '30': ("AI-Powered Semantic Commit", "ai-commit"),
                     '31': ("Manage Accounts (Switch/Add/List)", "accounts"),
-                                    '32': ("AI Diagnostic (List Available Models)", "ai-diagnostic"),
-                                    '33': ("SSH Key Infrastructure Manager", "ssh-setup"),
-                                    '34': ("Launch TUI Dashboard (BETA)", "tui"),
-                                    '0': ("Exit PyGitUp", "exit")
-                                }
+                    '32': ("AI Diagnostic (List Available Models)", "ai-diagnostic"),
+                    '33': ("SSH Key Infrastructure Manager", "ssh-setup"),
+                    '34': ("Launch TUI Dashboard (BETA)", "tui"),
+                    '0': ("Exit PyGitUp", "exit")
+                }
+
                 display_menu(menu_options)
                 max_choice = max([int(k) for k in menu_options.keys() if k.isdigit()])
                 choice = input(f"\n👉 Enter your choice (0-{max_choice}): ")
@@ -255,3 +256,6 @@ def main():
         print_error(f"A critical error occurred: {e}")
         print_info("Please report this bug at: https://github.com/frederickabrah/PyGitup/issues")
         sys.exit(1)
+
+if __name__ == "__main__":
+    main()
