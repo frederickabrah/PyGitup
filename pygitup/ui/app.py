@@ -9,6 +9,20 @@ from textual.binding import Binding
 
 from .. import __version__
 
+from ..core.config import load_config, get_github_username, get_github_token, get_active_profile_path
+
+from ..project.project_ops import upload_project_directory
+
+from ..utils.ai import ai_commit_workflow
+
+from ..github.repo_info import get_detailed_repo_info, get_fork_intelligence
+
+from ..github.ssh_ops import setup_ssh_infrastructure
+
+from ..github.actions import manage_actions, setup_cicd_workflow
+
+import os
+
 
 
 class FeatureItem(ListItem):
@@ -89,75 +103,41 @@ class PyGitUpTUI(App):
 
     
 
-        ListItem {
+    ListItem {
+
+        padding: 1 1;
+
+        border-bottom: hkey #30363d;
+
+    }
 
     
 
-            padding: 1 1;
+    ListItem:hover {
+
+        background: #1f6feb;
+
+    }
 
     
 
-            border-bottom: hkey #30363d;
+    ListView:focus > ListItem.--highlight {
 
-    
+        background: #238636;
 
-        }
+    }
 
-    
 
-        
 
-    
+    #feature-title {
 
-        ListItem:hover {
+        color: #58a6ff;
 
-    
+        text-style: bold;
 
-            background: #1f6feb;
+        margin-bottom: 1;
 
-    
-
-        }
-
-    
-
-        
-
-    
-
-        ListView:focus > ListItem.--highlight {
-
-    
-
-            background: #238636;
-
-    
-
-        }
-
-    
-
-    
-
-    
-
-        #feature-title {
-
-    
-
-            color: #58a6ff;
-
-    
-
-            text-style: bold;
-
-    
-
-            margin-bottom: 1;
-
-    
-
-        }
+    }
 
 
 
@@ -177,8 +157,6 @@ class PyGitUpTUI(App):
 
         Binding("r", "refresh", "Refresh", show=True),
 
-        Binding("s", "switch_profile", "Switch Profile", show=True),
-
         Binding("enter", "select", "Launch Feature", show=True),
 
     ]
@@ -187,13 +165,15 @@ class PyGitUpTUI(App):
 
     def compose(self) -> ComposeResult:
 
+        active_profile = os.path.basename(get_active_profile_path()).replace(".yaml", "")
+
         yield Header(show_clock=True)
 
         yield Horizontal(
 
             Vertical(
 
-                Label(" 🛰️ INTELLIGENCE HUB ", classes="category-header"),
+                Label(f" PROFILE: {active_profile} ", classes="category-header"),
 
                 ListView(
 
@@ -205,9 +185,7 @@ class PyGitUpTUI(App):
 
                     FeatureItem("Fork Network Recon", "fork-intel", "GitHub", "Analyze community forks for unique code and hidden improvements."),
 
-                    FeatureItem("CI/CD Architect", "ssh-setup", "GitHub", "Automated GitHub Actions generation and live build monitoring."),
-
-                    FeatureItem("Identity Switcher", "accounts", "Tools", "Swap between Work and Personal GitHub profiles instantly."),
+                    FeatureItem("CI/CD Architect", "cicd", "GitHub", "Automated GitHub Actions generation and live build monitoring."),
 
                     FeatureItem("SSH Infrastructure", "ssh-setup", "GitHub", "Auto-generate and sync secure Ed25519 keys with GitHub."),
 
@@ -243,19 +221,93 @@ class PyGitUpTUI(App):
 
             self.query_one("#feature-title").update(f"🚀 {item.feature_name}")
 
-            self.query_one("#feature-desc").update(f"{item.description}\n\n[dim]Press ENTER to launch this module.[/dim]")
+            self.query_one("#feature-desc").update(f"{item.description}\n\n[bold white]Press ENTER to launch.[/bold white]")
 
 
 
     def action_refresh(self) -> None:
 
-        self.notify("Refreshing all intelligence feeds...", title="System")
+        self.notify("System Status: Online 🟢")
 
 
 
     def action_select(self) -> None:
 
-        self.notify("Launching module... please wait.", title="Executive Order")
+        list_view = self.query_one("#feature-list", ListView)
+
+        if list_view.highlighted_child:
+
+            item = list_view.highlighted_child
+
+            self.launch_feature(item.mode)
+
+
+
+    def launch_feature(self, mode: str):
+
+        """Suspends the TUI to run the selected CLI feature."""
+
+        # Load config fresh
+
+        config = load_config()
+
+        user = get_github_username(config)
+
+        token = get_github_token(config)
+
+        
+
+        # Suspend app to allow terminal output
+
+        with self.suspend():
+
+            try:
+
+                if mode == "project":
+
+                    upload_project_directory(user, token, config)
+
+                elif mode == "ai-commit":
+
+                    ai_commit_workflow(user, token, config)
+
+                elif mode == "repo-info":
+
+                    # Mock args for compatibility
+
+                    class MockArgs: url = None
+
+                    get_detailed_repo_info(MockArgs(), token)
+
+                elif mode == "fork-intel":
+
+                    url = input("Enter repository URL: ")
+
+                    from ..github.repo_info import parse_github_url
+
+                    owner, repo = parse_github_url(url)
+
+                    if owner and repo:
+
+                        get_fork_intelligence(owner, repo, token)
+
+                elif mode == "ssh-setup":
+
+                    setup_ssh_infrastructure(config, token)
+
+                elif mode == "cicd":
+
+                    setup_cicd_workflow(user, token, None, config)
+
+                
+
+                input("\nPress Enter to return to dashboard...")
+
+            except Exception as e:
+
+                print(f"\nError running feature: {e}")
+
+                input("Press Enter to continue...")
 
 
 
