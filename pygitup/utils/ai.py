@@ -114,22 +114,39 @@ def suggest_todo_fix(api_key, todo_text, context_code):
     return call_gemini_api(api_key, prompt, timeout=20)
 
 def generate_ai_readme(api_key, project_name, file_list, code_context=""):
-    """Uses Gemini to generate a professional README based on structure and code content."""
-    files = file_list[:3000] if len(file_list) > 3000 else file_list
-    context = code_context[:7000] if len(code_context) > 7000 else code_context
-
-    prompt = f"""
-    Write a professional README.md for the project '{project_name}'.
-    STRUCTURE: {files}
-    CODE SNIPPETS: {context}
-    
-    INSTRUCTIONS:
-    1. Determine what the project actually DOES.
-    2. Write a professional introduction and feature list.
-    3. Include REAL installation steps.
-    4. Format in beautiful Markdown.
-    """
+    # ... (existing code)
     return call_gemini_api(api_key, prompt)
+
+def generate_ai_workflow(api_key, project_name, file_list, code_context=""):
+    """Uses Gemini to architect a custom CI/CD pipeline based on project analysis."""
+    context = code_context[:7000] if len(code_context) > 7000 else code_context
+    
+    prompt = f"""
+    Architect a professional GitHub Actions CI/CD pipeline for the project '{project_name}'.
+    
+    PROJECT STRUCTURE:
+    {file_list}
+    
+    CORE CODE CONTEXT:
+    {context}
+    
+    RULES:
+    1. Identify the primary language and framework.
+    2. Write a complete, valid YAML for '.github/workflows/main.yml'.
+    3. Include steps for: Dependency installation, Linting (use the best tool for the language), and Testing.
+    4. If you see specific requirements (e.g. database, docker), include the necessary services.
+    5. Output ONLY the raw YAML code. No explanations.
+    """
+    
+    msg = call_gemini_api(api_key, prompt)
+    if msg and msg.startswith("```"):
+        # Strip markdown code blocks
+        lines = msg.splitlines()
+        if "yaml" in lines[0] or "yml" in lines[0]:
+            msg = "\n".join(lines[1:-1])
+        else:
+            msg = "\n".join(lines[1:-1])
+    return msg
 
 def ai_commit_workflow(github_username, github_token, config):
     """Orchestrates the AI commit process with auto-staging support."""
