@@ -5,3 +5,5 @@ pip-audit
 inquirer
 rich
 beautifulsoup4
+pytest
+textual
