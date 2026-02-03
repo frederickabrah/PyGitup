@@ -63,6 +63,12 @@ def perform_update():
             result = subprocess.run(["git", "pull", "origin", "main"], capture_output=True, text=True)
             
             if result.returncode == 0:
+                print_success("Code successfully pulled from GitHub.")
+                
+                # 3. Deep Reinstall (Update dependencies and entry points)
+                print_info("Updating environment and dependencies...")
+                subprocess.run([sys.executable, "-m", "pip", "install", "-e", "."], capture_output=True)
+                
                 print_success("PyGitUp updated to the latest version!")
                 print_info("Please restart the tool to apply changes.")
                 os.chdir(original_cwd)
