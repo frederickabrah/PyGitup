@@ -89,43 +89,75 @@ class PyGitUpTUI(App):
 
     
 
-    ListItem {
-
-        padding: 1 1;
-
-        border-bottom: thin #30363d;
-
-    }
+        ListItem {
 
     
 
-    ListItem:hover {
-
-        background: #1f6feb;
-
-    }
+            padding: 1 1;
 
     
 
-    ListView:focus > ListItem.--highlight {
+            border-bottom: hkey #30363d;
 
-        background: #238636;
+    
 
-    }
+        }
 
+    
 
+        
 
-    #feature-title {
+    
 
-        color: #58a6ff;
+        ListItem:hover {
 
-        text-style: bold;
+    
 
-        font-size: 150%;
+            background: #1f6feb;
 
-        margin-bottom: 1;
+    
 
-    }
+        }
+
+    
+
+        
+
+    
+
+        ListView:focus > ListItem.--highlight {
+
+    
+
+            background: #238636;
+
+    
+
+        }
+
+    
+
+    
+
+    
+
+        #feature-title {
+
+    
+
+            color: #58a6ff;
+
+    
+
+            text-style: bold;
+
+    
+
+            margin-bottom: 1;
+
+    
+
+        }
 
 
 
