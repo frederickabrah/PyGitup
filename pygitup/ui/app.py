@@ -22,6 +22,16 @@ class FeatureItem(ListItem):
     def compose(self) -> ComposeResult:
         yield Label(f" {self.feature_name} [dim]({self.category})[/dim]")
 
+class HeaderItem(ListItem):
+    """A non-selectable header item for the list."""
+    def __init__(self, text: str):
+        # Setting disabled=True ensures it can't be highlighted or selected
+        super().__init__(disabled=True)
+        self.text = text
+
+    def compose(self) -> ComposeResult:
+        yield Label(f" {self.text} ", classes="category-header")
+
 class PyGitUpTUI(App):
     """The total immersion God Mode Dashboard."""
     
@@ -30,16 +40,21 @@ class PyGitUpTUI(App):
     Screen { background: #0d1117; }
     #sidebar { width: 45; background: #161b22; border-right: tall #30363d; }
     #main-switcher { padding: 1 4; width: 100%; }
-    .category-header { background: #21262d; color: #58a6ff; text-style: bold; padding: 0 1; margin: 1 0 0 0; text-align: center; }
+    .category-header { 
+        background: #21262d; 
+        color: #58a6ff; 
+        text-style: bold; 
+        width: 100%;
+        text-align: center;
+    }
     ListItem { padding: 1 1; border-bottom: hkey #30363d; }
     ListItem:hover { background: #1f6feb; }
     ListView:focus > ListItem.--highlight { background: #238636; color: white; }
-    .title { color: #58a6ff; text-style: bold; margin-bottom: 1; }
+    .title { color: #58a6ff; text-style: bold; margin-bottom: 1; font-size: 150%; }
     Markdown, DataTable { height: 100%; border: solid #30363d; padding: 1; background: #0d1117; }
     .btn-row { margin-top: 1; height: 3; }
     Button { margin-right: 2; }
-    .status-active { color: #238636; text-style: bold; }
-    """
+    "
 
     BINDINGS = [
         Binding("q", "quit", "Quit", show=True),
@@ -55,18 +70,18 @@ class PyGitUpTUI(App):
                 Label(f" 👤 PROFILE: {active_profile} ", classes="category-header", id="profile-label"),
                 ScrollableContainer(
                     ListView(
-                        Label(" AI & OSINT ", classes="category-header"),
+                        HeaderItem("AI & OSINT"),
                         FeatureItem("Intelligence Center", "osint", "GitHub", "Deep reconnaissance and health stats."),
                         FeatureItem("AI Commit Lab", "ai-lab", "Tools", "Native AI commit generator."),
                         FeatureItem("Analytics Studio", "analytics", "Tools", "Predictive growth metrics."),
                         
-                        Label(" SECURITY & CORE ", classes="category-header"),
+                        HeaderItem("SECURITY & CORE"),
                         FeatureItem("Sentinel SAST", "security", "Tools", "Native vulnerability scanner."),
                         FeatureItem("Marketplace", "marketplace", "Core", "Deploy 'God Tier' architectures."),
                         FeatureItem("SSH Infrastructure", "ssh", "Tools", "Automated authentication setup."),
                         FeatureItem("Identity Vault", "identity", "Tools", "Manage stealth profiles."),
                         
-                        Label(" GIT COMMANDER ", classes="category-header"),
+                        HeaderItem("GIT COMMANDER"),
                         FeatureItem("Smart Push", "smart-push", "Git", "Squash and push messy history."),
                         FeatureItem("Branch Control", "branch", "Git", "Manage repository branches."),
                         FeatureItem("Release Architect", "release", "GitHub", "AI release note generator."),
@@ -76,19 +91,16 @@ class PyGitUpTUI(App):
                 id="sidebar"
             ),
             ContentSwitcher(
-                # --- Home ---
                 Vertical(
                     Static("PyGitUp God Mode Dashboard", classes="title"),
-                    Static("PyGitUp has evolved into a complete developer ecosystem.\nSelect a module from the left to begin the immersive experience.", id="home-desc"),
+                    Static("PyGitUp has evolved into a complete developer ecosystem.\nSelect a module from the left to begin.", id="home-desc"),
                     id="home-view"
                 ),
-                # --- OSINT ---
                 Vertical(
                     Static("📡 OSINT Reconnaissance", classes="title"),
                     Markdown("", id="intel-report"),
                     id="osint-view"
                 ),
-                # --- AI LAB ---
                 Vertical(
                     Static("🧠 AI Semantic Commit Lab", classes="title"),
                     Markdown("", id="ai-diff-view"),
@@ -99,13 +111,11 @@ class PyGitUpTUI(App):
                     ),
                     id="ai-lab-view"
                 ),
-                # --- ANALYTICS ---
                 Vertical(
                     Static("📊 Analytics Studio", classes="title"),
                     Markdown("", id="analytics-report"),
                     id="analytics-view"
                 ),
-                # --- SECURITY ---
                 Vertical(
                     Static("🛡️ Sentinel SAST Scanner", classes="title"),
                     DataTable(id="security-table"),
@@ -115,13 +125,11 @@ class PyGitUpTUI(App):
                     ),
                     id="security-view"
                 ),
-                # --- IDENTITY ---
                 Vertical(
                     Static("🔐 Identity Vault", classes="title"),
                     ListView(id="profile-list"),
                     id="identity-view"
                 ),
-                # --- MARKETPLACE ---
                 Vertical(
                     Static("🏗️ Template Marketplace", classes="title"),
                     Grid(
@@ -140,15 +148,16 @@ class PyGitUpTUI(App):
 
     def on_mount(self) -> None:
         self.query_one("#feature-list").focus()
-        # Setup Security Table
         table = self.query_one("#security-table", DataTable)
         table.add_columns("Threat", "Location", "Snippet")
 
     def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
-        if event.item and self.query_one("#main-switcher").current == "home-view":
-            self.query_one("#home-desc").update(f"{event.item.description}\n\n[bold white]Press ENTER to activate.[/bold white]")
+        if event.item and isinstance(event.item, FeatureItem):
+            if self.query_one("#main-switcher").current == "home-view":
+                self.query_one("#home-desc").update(f"{event.item.description}\n\n[bold white]Press ENTER to activate.[/bold white]")
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
+        if not isinstance(event.item, FeatureItem): return
         mode = event.item.mode
         if mode == "osint": self.run_osint_view()
         elif mode == "ai-lab": self.run_ai_lab()
@@ -157,8 +166,6 @@ class PyGitUpTUI(App):
         elif mode == "identity": self.run_identity_view()
         elif mode == "marketplace": self.run_marketplace_view()
         else: self.launch_cli_fallback(mode)
-
-    # --- NATIVE VIEW HANDLERS ---
 
     def run_osint_view(self):
         self.query_one("#main-switcher").current = "osint-view"
@@ -186,8 +193,6 @@ class PyGitUpTUI(App):
 
     def run_marketplace_view(self):
         self.query_one("#main-switcher").current = "marketplace-view"
-
-    # --- LOGIC & WORKERS ---
 
     async def fetch_intel_task(self):
         config = load_config(); token = get_github_token(config)
@@ -226,7 +231,6 @@ class PyGitUpTUI(App):
     def action_go_home(self): self.query_one("#main-switcher").current = "home-view"
 
     def launch_cli_fallback(self, mode):
-        # ... (same robust launcher as before)
         from ..project.project_ops import upload_project_directory
         from ..github.ssh_ops import setup_ssh_infrastructure
         config = load_config(); user = get_github_username(config); token = get_github_token(config)
