@@ -2,6 +2,7 @@ import subprocess
 import requests
 import json
 import time
+import re
 from .ui import print_info, print_error, print_warning, print_success, console, Panel
 
 def get_git_diff():
@@ -51,7 +52,7 @@ def call_gemini_api(api_key, prompt, timeout=30):
         "gemini-2.5-pro",
         "gemini-1.5-pro"
     ]
-    # v1beta is prioritized due to 47 models found in diagnostic
+    # v1beta is prioritized due to high availability in diagnostics
     api_versions = ["v1beta", "v1"]
     
     last_error = ""
@@ -71,13 +72,12 @@ def call_gemini_api(api_key, prompt, timeout=30):
                         return data['candidates'][0]['content']['parts'][0]['text'].strip()
                     except (KeyError, IndexError):
                         last_error = f"[{model}] Malformed response body."
-                        print_warning(f"   ⚠️  Bad response structure. Trying next...")
                         continue
 
                 elif response.status_code == 429:
                     print_warning(f"   ⏳ Rate limit hit (429). Cooling down for 3s...")
                     time.sleep(3)
-                    continue # Try next model/version
+                    continue 
                 
                 else:
                     last_error = f"[{model}/{version}] HTTP {response.status_code}: {response.text}"
@@ -89,9 +89,8 @@ def call_gemini_api(api_key, prompt, timeout=30):
                 print_warning(f"   ⚠️  Connection failed.")
                 continue
 
-    print_error(f"❌ AI Engine exhausted all {len(models) * len(api_versions)} fallback combinations.")
+    print_error(f"❌ AI Engine exhausted all fallback combinations.")
     console.print(Panel(last_error, title="Final Raw Error", border_style="red"))
-    print_info("\n💡 TIP: Run Option 32 to see exactly which models your key supports.")
     return None
 
 def generate_ai_commit_message(api_key, diff_text):
@@ -103,9 +102,26 @@ def generate_ai_commit_message(api_key, diff_text):
     return msg
 
 def generate_ai_release_notes(api_key, repo_name, commit_history):
-    """Generates professional release notes using tiered fallback."""
+    """Uses Gemini to summarize recent history into a professional release announcement."""
+    if not api_key: return None
+
+    # Format history for the AI
     history_text = "\n".join([f"- {c['commit']['message'].splitlines()[0]}" for c in commit_history[:30]])
-    prompt = f"Write a professional Release Announcement for '{repo_name}' based on these commits:\n{history_text}"
+    
+    prompt = f"""
+    You are a Lead Software Architect. 
+    Write a technical release announcement for the project '{repo_name}'.
+    
+    RECENT CHANGES:
+    {history_text}
+    
+    CRITICAL CONSTRAINTS:
+    1. DO NOT use placeholders like "[City, State]", "[Date]", or "[Name]".
+    2. DO NOT use bracketed text or generic fill-in-the-blanks.
+    3. Use real data from the provided changes.
+    4. Sections: '🚀 Highlights', '🛠️ Technical Changes', '🛡️ Security & Stability'.
+    5. Professional, technical, and concise tone.
+    """
     return call_gemini_api(api_key, prompt)
 
 def suggest_todo_fix(api_key, todo_text, context_code):
@@ -114,33 +130,35 @@ def suggest_todo_fix(api_key, todo_text, context_code):
     return call_gemini_api(api_key, prompt, timeout=20)
 
 def generate_ai_readme(api_key, project_name, file_list, code_context=""):
-    # ... (existing code)
+    """Uses Gemini to generate a professional README based on structure and code content."""
+    files = file_list[:3000] if len(file_list) > 3000 else file_list
+    context = code_context[:7000] if len(code_context) > 7000 else code_context
+
+    prompt = f"""
+    Write a professional README.md for the project '{project_name}'.
+    STRUCTURE: {files}
+    CODE CONTEXT: {context}
+    
+    INSTRUCTIONS:
+    1. Determine what the project actually DOES.
+    2. Write a professional introduction and feature list.
+    3. Include REAL installation steps based on the code.
+    4. Format in beautiful Markdown. No placeholders.
+    """
     return call_gemini_api(api_key, prompt)
 
 def generate_ai_workflow(api_key, project_name, file_list, code_context=""):
-    # ... (existing code)
-    return call_gemini_api(api_key, prompt)
+    """Uses Gemini to architect a custom CI/CD pipeline."""
+    prompt = f"Architect a professional GitHub Actions YAML for '{project_name}'. Structure: {file_list}. Context: {code_context[:5000]}"
+    msg = call_gemini_api(api_key, prompt)
+    if msg and msg.startswith("```"):
+        msg = "\n".join(msg.splitlines()[1:-1])
+    return msg
 
 def analyze_failed_log(api_key, log_text):
-    """Uses Gemini to debug a failed CI/CD build log and suggest a fix."""
-    if not api_key: return None
-    
-    # Take the last 5000 chars of the log (usually where the error is)
-    snippet = log_text[-5000:] if len(log_text) > 5000 else log_text
-    
-    prompt = f"""
-    You are an expert DevOps and Debugging Assistant.
-    The following is a failed GitHub Actions build log snippet:
-    
-    {snippet}
-    
-    TASKS:
-    1. Identify the EXACT error that caused the build to fail.
-    2. Explain WHY it happened in plain English.
-    3. Suggest the code fix or command needed to resolve it.
-    
-    Format as beautiful Markdown.
-    """
+    """Uses Gemini to debug a failed build log."""
+    snippet = log_text[-5000:]
+    prompt = f"Analyze this failed build log and identify the root cause and fix:\n{snippet}"
     return call_gemini_api(api_key, prompt)
 
 def ai_commit_workflow(github_username, github_token, config):
