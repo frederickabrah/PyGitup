@@ -24,7 +24,7 @@ SAST_RULES = {
     "SQL Injection": [r"execute\(.*%.*\)", r"execute\(.*format\(.*", r"execute\(.*f\".*\""],
     "Command Injection": [r"os\.system\(", r"subprocess\.run\(.*shell=True", r"eval\("],
     "Insecure Crypto": [r"hashlib\.md5\(", r"hashlib\.sha1\("],
-    "Hardcoded Secret": [r"password\s*=\s*['\"] સંપર્ક ['\"]", r"secret\s*=\s*['\"] સંપર્ક ['\"]", r"api_key\s*=\s*['\"] સંપર્ક ['\"]"]
+    "Hardcoded Secret": [r"password\s*=\s*['\"].*['\"]", r"secret\s*=\s*['\"].*['\"]", r"api_key\s*=\s*['\"].*['\"]"]
 }
 
 def calculate_entropy(data):
