@@ -156,9 +156,28 @@ def generate_ai_workflow(api_key, project_name, file_list, code_context=""):
     return msg
 
 def analyze_failed_log(api_key, log_text):
-    """Uses Gemini to debug a failed build log."""
-    snippet = log_text[-5000:]
-    prompt = f"Analyze this failed build log and identify the root cause and fix:\n{snippet}"
+    # ... (existing code)
+    return call_gemini_api(api_key, prompt)
+
+def code_mentor_chat(api_key, query, code_context):
+    """Uses Gemini as a Code Mentor to answer questions about the local codebase."""
+    if not api_key: return "API Key missing."
+    
+    prompt = f"""
+    You are 'PyGitUp Mentor', an elite Software Architect.
+    
+    CONTEXT OF THE CURRENT PROJECT:
+    {code_context[:8000]} # Limit context for speed
+    
+    USER QUERY:
+    {query}
+    
+    INSTRUCTIONS:
+    1. Answer based on the provided project context.
+    2. Be technical, accurate, and direct.
+    3. If providing code, use clean, production-ready syntax.
+    4. Help the user optimize, debug, or understand their architecture.
+    """
     return call_gemini_api(api_key, prompt)
 
 def ai_commit_workflow(github_username, github_token, config):
