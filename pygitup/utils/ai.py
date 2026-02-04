@@ -159,26 +159,67 @@ def analyze_failed_log(api_key, log_text):
     # ... (existing code)
     return call_gemini_api(api_key, prompt)
 
-def code_mentor_chat(api_key, query, code_context):
-    """Uses Gemini as a Code Mentor to answer questions about the local codebase."""
+def code_mentor_chat(api_key, query, code_context, history=None):
+    """Uses Gemini as a Code Mentor with session-based memory."""
     if not api_key: return "API Key missing."
     
-    prompt = f"""
+    if history is None:
+        history = []
+
+    # Foundational prompt with codebase context
+    system_instruction = f"""
     You are 'PyGitUp Mentor', an elite Software Architect.
     
-    CONTEXT OF THE CURRENT PROJECT:
-    {code_context[:8000]} # Limit context for speed
-    
-    USER QUERY:
-    {query}
+    KNOWLEDGE BASE (Current Project):
+    {code_context[:8000]}
     
     INSTRUCTIONS:
-    1. Answer based on the provided project context.
-    2. Be technical, accurate, and direct.
-    3. If providing code, use clean, production-ready syntax.
-    4. Help the user optimize, debug, or understand their architecture.
+    1. Answer based on the project context and our ongoing conversation.
+    2. Be technical, direct, and provide production-ready code fixes.
+    3. Maintain continuity in our discussion.
     """
-    return call_gemini_api(api_key, prompt)
+
+    # Format the multi-turn payload
+    contents = []
+    
+    # 1. Inject system instruction as the first user turn if history is empty
+    # or as a prefix to the first message.
+    
+    # 2. Add history
+    for msg in history:
+        contents.append({
+            "role": "user" if msg['role'] == 'user' else "model",
+            "parts": [{"text": msg['text']}]
+        })
+    
+    # 3. Add current query with context enforcement
+    current_text = f"[SYSTEM: Follow architecture guidelines from context]\n{query}" if not history else query
+    contents.append({
+        "role": "user",
+        "parts": [{"text": current_text}]
+    })
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+    # Note: We use the same tiered fallback logic by calling our centralized caller with the built contents
+    
+    payload = {
+        "contents": contents,
+        "system_instruction": {"parts": [{"text": system_instruction}]}
+    }
+
+    try:
+        response = requests.post(url, json=payload, timeout=30)
+        if response.status_code == 200:
+            return response.json()['candidates'][0]['content']['parts'][0]['text'].strip()
+        else:
+            # Fallback to 1.5 Pro if 2.5 Flash fails
+            url_fallback = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={api_key}"
+            response = requests.post(url_fallback, json=payload, timeout=30)
+            if response.status_code == 200:
+                return response.json()['candidates'][0]['content']['parts'][0]['text'].strip()
+            return f"Error: {response.status_code}"
+    except Exception as e:
+        return f"Connection error: {e}"
 
 def ai_commit_workflow(github_username, github_token, config):
     """Orchestrates the AI commit process with auto-staging support."""

@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from ..github.api import update_file, get_file_info, create_repo, get_repo_info, get_user_repos
 from ..utils.security import scan_directory_for_sensitive_files, audit_files_and_prompt, check_is_sensitive
-from ..utils.validation import validate_repo_name, validate_file_path, sanitize_input
+from ..utils.validation import validate_repo_name, validate_file_path, sanitize_input, normalize_repo_path, validate_git_url
 from ..utils.ui import print_header, print_info, print_success, print_error, print_warning
 
 TQDM_AVAILABLE = True # Assume available for now
@@ -191,6 +191,13 @@ def get_single_file_input(config, args=None):
         repo_file_path = args.path
     else:
         repo_file_path = input("Enter the path for the file in the repository (e.g., folder/file.txt): ")
+
+    # Security: Normalize path
+    try:
+        repo_file_path = normalize_repo_path(repo_file_path)
+    except ValueError as e:
+        print_error(str(e))
+        return None, None, None, None
 
     if args and args.message:
         commit_message = args.message
@@ -475,6 +482,14 @@ def migrate_repository(github_username, github_token, config, args=None):
     print_header("The Great Migration Porter")
     
     src_url = args.url if args and hasattr(args, 'url') and args.url else input("🔗 Enter Source Repository URL (GitLab/Bitbucket/etc): ")
+    
+    # Security: Validate Source URL
+    try:
+        validate_git_url(src_url)
+    except ValueError as e:
+        print_error(str(e))
+        return
+
     dest_name = args.repo if args and hasattr(args, 'repo') and args.repo else input("📦 Enter Destination GitHub Repository Name: ")
     
     is_private = args.private if args and hasattr(args, 'private') else input("🔒 Make destination private? (y/n) [y]: ").lower() != 'n'
@@ -524,20 +539,22 @@ def manage_bulk_repositories(github_token):
         import math
         for r in repos:
             stars = r.get('stargazers_count', 0)
-            issues = r.get('open_issues_count', 0)
+            forks = r.get('forks_count', 0)
+            open_issues = r.get('open_issues_count', 0)
             
-            # Sophisticated Health Logic:
-            # 1. Star Weight: Logarithmic growth (tanh caps it)
-            # 2. Issue Penalty: Non-linear decay based on star-to-issue ratio
-            star_impact = math.tanh(stars / 50.0) * 70  # Max 70 points from stars
-            issue_ratio = issues / (stars + 1)
-            issue_penalty = math.tanh(issue_ratio) * 30 # Max 30 point penalty
+            # Real Intelligence Logic:
+            # 1. Maintenance (40 pts): Ratio of forks to issues (engagement vs burden)
+            m_score = min((forks / (open_issues + 1)) * 20, 40)
             
-            health_score = int(30 + star_impact - issue_penalty) # Baseline of 30
+            # 2. Popularity (40 pts): Star density
+            p_score = min(math.log2(stars + 1) * 5, 40)
+            
+            # 3. Baseline Activity (20 pts)
+            health_score = int(m_score + p_score + 20)
             health_score = max(0, min(100, health_score))
             
-            color = "green" if health_score > 75 else "yellow" if health_score > 45 else "red"
-            print(f"{r['name']:<40} | {stars:<6} | {issues:<6} | [{color}]{health_score}%[/{color}]")
+            color = "green" if health_score > 70 else "yellow" if health_score > 40 else "red"
+            print(f"{r['name']:<40} | {stars:<6} | {open_issues:<6} | [{color}]{health_score}%[/{color}]")
             
     except Exception as e:
         print_error(f"Bulk operation failed: {e}")

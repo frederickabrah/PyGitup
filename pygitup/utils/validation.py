@@ -1,40 +1,79 @@
-
 import re
 import os
+import urllib.parse
 
 def validate_repo_name(name):
-    """
-    Validates a GitHub repository name.
-    Rules: Only alphanumeric characters, hyphens, and underscores.
-    """
+    """Validates GitHub repository names."""
     if not name:
         return False, "Repository name cannot be empty."
-    
-    if not re.match(r'^[a-zA-Z0-9\-_.]+$', name):
-        return False, "Invalid repository name. Use only letters, numbers, hyphens, dots, and underscores."
-    
-    if len(name) > 100:
-        return False, "Repository name is too long (max 100 characters)."
-        
+    if not re.match(r'^[a-zA-Z0-9._-]+$', name):
+        return False, "Invalid repository name. Use only alphanumeric characters, dots, underscores, and hyphens."
     return True, ""
 
-def validate_file_path(path, must_exist=True):
-    """
-    Validates a local file path.
-    """
+def validate_file_path(path):
+    """Validates local file paths."""
     if not path:
         return False, "File path cannot be empty."
-    
-    if must_exist and not os.path.exists(path):
+    if not os.path.exists(path):
         return False, f"File or directory does not exist: {path}"
-        
     return True, ""
 
+def normalize_repo_path(path):
+    """
+    Sanitizes repository paths to prevent traversal.
+    Returns a safe, relative path or raises ValueError.
+    """
+    if not path:
+        return "."
+    
+    # Remove leading slashes and drive letters
+    path = os.path.normpath(path).lstrip(os.sep).lstrip("/")
+    
+    # Block any attempt to go 'up'
+    if ".." in path.split(os.sep) or ".." in path.split("/"):
+        raise ValueError("Security Violation: Path traversal attempt detected.")
+    
+    return path
+
+def validate_git_url(url):
+    """
+    Strict validation for Git URLs to prevent command injection.
+    """
+    if not url:
+        raise ValueError("URL cannot be empty.")
+        
+    # Basic structure check
+    if not (url.startswith(('http://', 'https://', 'git@', 'ssh://'))):
+        raise ValueError("Invalid Git URL format. Must be HTTP, HTTPS, or SSH.")
+    
+    # Block shell metacharacters
+    forbidden = [';', '|', '&', '`', '$(', '${', '>', '<', '\\']
+    for char in forbidden:
+        if char in url:
+            raise ValueError(f"Security Violation: Dangerous character '{char}' detected in URL.")
+            
+    return True
+
+def get_current_repo_context():
+    """Extracts owner and repo name from local git remotes."""
+    try:
+        import subprocess
+        result = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True, text=True)
+        if result.returncode == 0:
+            url = result.stdout.strip()
+            # Handle both HTTPS and SSH formats
+            if "github.com" in url:
+                path = url.split("github.com")[-1].replace(":", "/").strip("/")
+                parts = path.replace(".git", "").split("/")
+                if len(parts) >= 2:
+                    return parts[0], parts[1]
+    except Exception:
+        pass
+    return None, None
+
 def sanitize_input(text):
-    """
-    Basic sanitization for string inputs.
-    Removes leading/trailing whitespace.
-    """
-    if text is None:
+    """Removes potentially dangerous characters from general text input."""
+    if not text:
         return ""
-    return str(text).strip()
+    # Remove everything except standard alpha-numeric and basic punctuation
+    return re.sub(r'[^a-zA-Z0-9\s._\-()]', '', text)
