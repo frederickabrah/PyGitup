@@ -54,7 +54,8 @@ class PyGitUpTUI(App):
     Markdown, DataTable { height: 100%; border: solid #30363d; padding: 1; background: #0d1117; }
     .btn-row { margin-top: 1; height: 3; }
     Button { margin-right: 2; }
-    "
+    .status-active { color: #238636; text-style: bold; }
+    """
 
     BINDINGS = [
         Binding("q", "quit", "Quit", show=True),
