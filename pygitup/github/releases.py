@@ -42,35 +42,39 @@ def get_release_input(config, args, github_username, github_token):
     
     # Release Notes Logic
     changelog = ""
-    console.print("\n[bold]Release Notes Options:[/bold]")
-    console.print("1: [cyan]AI-Generated Summary[/cyan]")
-    console.print("2: [green]Auto-Changelog (Commit list)[/green]")
-    console.print("3: [yellow]Manual Editor (Nano/Vim)[/yellow]")
-    console.print("4: [white]Skip / Basic prompt[/white]")
     
-    note_choice = input("\n👉 Choice: ")
-    
-    if note_choice == '1':
-        print_info("🤖 AI is analyzing your project history...")
-        resp = get_commit_history(github_username, repo_name, github_token)
-        if resp.status_code == 200:
-            ai_key = config["github"].get("ai_api_key")
-            changelog = generate_ai_release_notes(ai_key, repo_name, resp.json())
-            # Let user tweak the AI's output
-            if changelog:
-                confirm = input("AI notes generated. Edit them before publishing? (y/n): ").lower()
-                if confirm == 'y':
-                    changelog = open_editor(changelog)
+    # If in batch mode or message provided, skip the interactive menu
+    if args and (args.batch or args.message):
+        if args.generate_changelog:
+            changelog = generate_changelog(github_username, repo_name, github_token, version)
         else:
-            print_error("Failed to fetch history for AI.")
-            
-    elif note_choice == '2':
-        changelog = generate_changelog(github_username, repo_name, github_token, version)
-    elif note_choice == '3':
-        changelog = open_editor("# Release Notes for " + version + "\n\n")
+            changelog = args.message or f"Release {version}"
     else:
-        if args and args.message:
-            changelog = args.message
+        console.print("\n[bold]Release Notes Options:[/bold]")
+        console.print("1: [cyan]AI-Generated Summary[/cyan]")
+        console.print("2: [green]Auto-Changelog (Commit list)[/green]")
+        console.print("3: [yellow]Manual Editor (Nano/Vim)[/yellow]")
+        console.print("4: [white]Skip / Basic prompt[/white]")
+        
+        note_choice = input("\n👉 Choice: ")
+        
+        if note_choice == '1':
+            print_info("🤖 AI is analyzing your project history...")
+            resp = get_commit_history(github_username, repo_name, github_token)
+            if resp.status_code == 200:
+                ai_key = config["github"].get("ai_api_key")
+                changelog = generate_ai_release_notes(ai_key, repo_name, resp.json())
+                if changelog:
+                    confirm = input("AI notes generated. Edit them before publishing? (y/n): ").lower()
+                    if confirm == 'y':
+                        changelog = open_editor(changelog)
+            else:
+                print_error("Failed to fetch history for AI.")
+                
+        elif note_choice == '2':
+            changelog = generate_changelog(github_username, repo_name, github_token, version)
+        elif note_choice == '3':
+            changelog = open_editor("# Release Notes for " + version + "\n\n")
         else:
             changelog = input("Enter release notes: ")
     
