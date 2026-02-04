@@ -34,7 +34,7 @@ class HeaderItem(ListItem):
         yield Label(f" {self.text} ", classes="category-header")
 
 class PyGitUpTUI(App):
-    """The total immersion God Mode Dashboard - Engineered for Truth."""
+    """The total immersion God Mode Dashboard."""
     
     TITLE = f"PyGitUp v{__version__}"
     chat_history = [] 
@@ -58,7 +58,8 @@ class PyGitUpTUI(App):
     Markdown, DataTable { height: 100%; border: solid #30363d; padding: 1; background: #0d1117; }
     #chat-scroll { height: 1fr; border: solid #30363d; background: #090c10; margin-bottom: 1; }
     #chat-input { border: double #58a6ff; }
-    LoadingIndicator { color: #58a6ff; height: 3; }
+    LoadingIndicator { color: #58a6ff; height: 3; display: none; }
+    LoadingIndicator.-loading { display: block; }
     .btn-row { margin-top: 1; height: 3; }
     Button { margin-right: 2; }
     """
@@ -101,7 +102,7 @@ class PyGitUpTUI(App):
             ContentSwitcher(
                 Vertical(
                     Static("PYGITUP GLOBAL COMMAND CENTER", classes="title-banner"),
-                    Static("PyGitUp is officially immersive and reactive.\nSelect a module to begin.", id="home-desc"),
+                    Static("Welcome to God Mode.\nPyGitUp is officially immersive and reactive.\n\nSelect a neural module to begin.", id="home-desc"),
                     id="home-view"
                 ),
                 Vertical(
@@ -112,7 +113,7 @@ class PyGitUpTUI(App):
                 Vertical(
                     Static("🧠 NEURAL CODE MENTOR", classes="title-banner"),
                     ScrollableContainer(Markdown("System initialized. Ask me about your code...", id="mentor-chat-view"), id="chat-scroll"),
-                    LoadingIndicator(id="chat-loader", show=False),
+                    LoadingIndicator(id="chat-loader"),
                     Input(placeholder="Ask a technical question...", id="chat-input"),
                     id="mentor-view"
                 ),
@@ -177,11 +178,45 @@ class PyGitUpTUI(App):
         elif mode == "marketplace": self.run_marketplace_view()
         else: self.launch_cli_fallback(mode)
 
-    # --- DYNAMIC NATIVE HANDLERS (NO HARDCODING) ---
+    # --- NATIVE VIEWS ---
+    def run_mentor_view(self):
+        self.query_one("#main-switcher").current = "mentor-view"
+        self.query_one("#chat-input").focus()
+
+    async def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "chat-input":
+            query = event.value; event.input.value = ""
+            self.query_one("#chat-loader").add_class("-loading")
+            self.run_worker(self.mentor_task(query))
+
+    async def mentor_task(self, query):
+        ctx = self.gather_smart_context()
+        config = load_config(); ai_key = config["github"].get("ai_api_key")
+        from ..utils.ai import code_mentor_chat
+        resp = code_mentor_chat(ai_key, query, ctx, history=self.chat_history)
+        self.chat_history.append({"role": "user", "text": query})
+        self.chat_history.append({"role": "model", "text": resp})
+        self.query_one("#chat-loader").remove_class("-loading")
+        full_conversation = "# Neural Conversation History\n"
+        for turn in self.chat_history:
+            icon = "👤 **You**" if turn['role'] == "user" else "🤖 **Mentor**"
+            full_conversation += f"\n---\n{icon}\n{turn['text']}\n"
+        self.query_one("#mentor-chat-view").update(full_conversation)
+        self.query_one("#chat-scroll").scroll_end(animate=False)
+
+    def gather_smart_context(self):
+        context = "Structure:\n"
+        for root, _, files in os.walk("."):
+            if any(x in root for x in [".git", "node_modules"]): continue
+            for f in files: context += f"{root}/{f}\n"
+        priority = ["main.py", "setup.py", "requirements.txt", "pygitup/ui/app.py"]
+        for p in priority:
+            if os.path.exists(p):
+                with open(p, 'r', errors='ignore') as f: context += f"\n\n--- {p} ---\n" + "".join(f.readlines()[:150])
+        return context
 
     def run_osint_view(self):
         self.query_one("#main-switcher").current = "osint-view"
-        self.query_one("#intel-report").update("# 📡 Initializing Satellite Link...")
         self.run_worker(self.fetch_intel_task())
 
     async def fetch_intel_task(self):
@@ -189,27 +224,17 @@ class PyGitUpTUI(App):
         if not owner or not repo:
             self.query_one("#intel-report").update("## ❌ Context Error\nCould not find Git 'origin' remote.")
             return
-
         config = load_config(); token = get_github_token(config)
         try:
             resp = get_repo_info(owner, repo, token)
             if resp.status_code == 200:
                 data = resp.json(); health = get_repo_health_metrics(owner, repo, token)
-                md = f"# 🛰️ Intelligence: {owner}/{repo}\n\n"
-                md += f"| Metric | Intelligence |\n| --- | --- |\n"
-                md += f"| ⭐ Stars | {data.get('stargazers_count')} |\n"
-                md += f"| 🍴 Forks | {data.get('forks_count')} |\n"
-                md += f"| 🚑 Health | {health.get('activity_status', 'N/A')} |\n"
-                md += f"| 🏃 Velocity | {health.get('development_velocity_days', 'N/A')} d/c |"
+                md = f"# 🛰️ {data.get('full_name')}\n\n| Attribute | Intelligence |\n| --- | --- |\n| ⭐ Stars | {data.get('stargazers_count')} |\n| 🍴 Forks | {data.get('forks_count')} |\n| 🚑 Health | {health.get('activity_status', 'N/A')} |"
                 self.query_one("#intel-report").update(md)
-            else:
-                self.query_one("#intel-report").update(f"## ❌ API Error\nStatus: {resp.status_code}")
-        except Exception as e:
-            self.query_one("#intel-report").update(f"## ❌ System Error\n{e}")
+        except: pass
 
     def run_analytics_view(self):
         self.query_one("#main-switcher").current = "analytics-view"
-        self.query_one("#analytics-report").update("# 📊 Crunching Momentum Data...")
         self.run_worker(self.fetch_analytics_task())
 
     async def fetch_analytics_task(self):
@@ -217,20 +242,14 @@ class PyGitUpTUI(App):
         if not owner or not repo:
             self.query_one("#analytics-report").update("## ❌ Context Error\nCould not identify repository.")
             return
-
-        config = load_config(); token = get_github_token(config)
+        config = load_config(); token = get_github_token(config); user = get_github_username(config)
         try:
             repo_resp = get_repo_info(owner, repo, token)
             if repo_resp.status_code == 200:
                 data = repo_resp.json()
                 proj = predict_growth_v2(data['stargazers_count'], data['created_at'], data['forks_count'])
-                self.query_one("#analytics-report").update(f"# 📈 Momentum: {repo}\n\n- **Projected Star Goal:** {proj} 🌟\n- **Status:** Data-Driven Projection Complete.")
-            else:
-                self.query_one("#analytics-report").update(f"## ❌ API Error\n{repo_resp.status_code}")
-        except Exception as e:
-            self.query_one("#analytics-report").update(f"## ❌ System Error\n{e}")
-
-    # --- BUTTON HANDLERS ---
+                self.query_one("#analytics-report").update(f"# 📈 Momentum: {repo}\n\n- **Projected Star Goal:** {proj} 🌟")
+        except: pass
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-scan": self.run_sast_scan()
@@ -245,11 +264,8 @@ class PyGitUpTUI(App):
         if results:
             for r in results: table.add_row(r['type'], os.path.basename(r['file']), r['code'])
             self.notify("Scan Complete: Issues Found", severity="warning")
-        else:
-            self.notify("Scan Complete: System Secure")
+        else: self.notify("Scan Complete: System Secure")
 
-    # --- UTILS ---
-    def run_mentor_view(self): self.query_one("#main-switcher").current = "mentor-view"; self.query_one("#chat-input").focus()
     def run_security_view(self): self.query_one("#main-switcher").current = "security-view"
     def run_identity_view(self):
         self.query_one("#main-switcher").current = "identity-view"
@@ -259,32 +275,26 @@ class PyGitUpTUI(App):
     def action_go_home(self): self.query_one("#main-switcher").current = "home-view"
 
     def launch_cli_fallback(self, mode):
-        from ..project.project_ops import upload_project_directory
-        from ..project.templates import create_project_from_template
+        from ..project.project_ops import upload_project_directory, migrate_repository
         from ..github.ssh_ops import setup_ssh_infrastructure
         from ..utils.ai import ai_commit_workflow
+        from ..project.templates import create_project_from_template
         config = load_config(); user = get_github_username(config); token = get_github_token(config)
-        
-        # Parse template mode if needed
         actual_mode = mode.split(" ")[0]
-        
         with self.suspend():
             os.system('cls' if os.name == 'nt' else 'clear')
             try:
                 if actual_mode == "project": upload_project_directory(user, token, config)
-                elif actual_mode == "template": 
-                    # If template name provided in mode string
+                elif actual_mode == "template":
                     if "--template" in mode:
                         t_name = mode.split("--template ")[1]
-                        # Mock args for compatibility
                         class MockArgs: template = t_name; repo = None; variables = None; private = True; dry_run = False
                         create_project_from_template(user, token, config, MockArgs())
-                    else:
-                        create_project_from_template(user, token, config)
+                    else: create_project_from_template(user, token, config)
                 elif actual_mode == "ai-commit": ai_commit_workflow(user, token, config)
                 elif actual_mode == "ssh": setup_ssh_infrastructure(config, token)
-                input("\nPress Enter to return to TUI Dashboard...")
-            except Exception as e: print(f"Error: {e}"); input("Press Enter...")
+                input("\nPress Enter to return to TUI...")
+            except: input("\nFailed. Press Enter...")
 
 def run_tui():
     PyGitUpTUI().run()
