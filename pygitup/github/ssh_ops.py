@@ -21,10 +21,12 @@ def setup_ssh_infrastructure(config, github_token):
 
     # 2. Add to SSH Agent
     try:
-        print_info("Adding key to SSH Agent...")
-        subprocess.run(["eval $(ssh-agent -s) && ssh-add " + key_path], shell=True, check=True, capture_output=True)
-    except subprocess.CalledProcessError:
-        print_warning("Could not add to ssh-agent automatically. You may need to run 'ssh-add' manually.")
+        print_info("Attempting to add key to SSH Agent...")
+        # Direct call to ssh-add. Assumes agent is already running in user session.
+        subprocess.run(["ssh-add", key_path], check=True, capture_output=True)
+        print_success("Key added to agent.")
+    except Exception:
+        print_warning("Could not add to ssh-agent automatically. Ensure the agent is running ('eval $(ssh-agent -s)').")
 
     # 3. Upload to GitHub
     title = f"PyGitUp Key - {os.uname().nodename}"

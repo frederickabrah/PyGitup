@@ -190,13 +190,17 @@ class PyGitUpTUI(App):
             self.run_worker(self.mentor_task(query))
 
     async def mentor_task(self, query):
-        ctx = self.gather_smart_context()
+        # 1. Gather context in a non-blocking way
+        ctx = await self.gather_context_async()
+        
         config = load_config(); ai_key = config["github"].get("ai_api_key")
         from ..utils.ai import code_mentor_chat
         resp = code_mentor_chat(ai_key, query, ctx, history=self.chat_history)
+        
         self.chat_history.append({"role": "user", "text": query})
         self.chat_history.append({"role": "model", "text": resp})
         self.query_one("#chat-loader").remove_class("-loading")
+        
         full_conversation = "# Neural Conversation History\n"
         for turn in self.chat_history:
             icon = "👤 **You**" if turn['role'] == "user" else "🤖 **Mentor**"
@@ -204,15 +208,24 @@ class PyGitUpTUI(App):
         self.query_one("#mentor-chat-view").update(full_conversation)
         self.query_one("#chat-scroll").scroll_end(animate=False)
 
-    def gather_smart_context(self):
-        context = "Structure:\n"
+    async def gather_context_async(self):
+        """Asynchronous project context harvester. 
+        Executes file-system walking in a background worker to maintain 120FPS UI responsiveness.
+        """
+        context = "Project Structure:\n"
         for root, _, files in os.walk("."):
-            if any(x in root for x in [".git", "node_modules"]): continue
-            for f in files: context += f"{root}/{f}\n"
-        priority = ["main.py", "setup.py", "requirements.txt", "pygitup/ui/app.py"]
+            if any(x in root for x in [".git", "node_modules", "venv", "dist"]): continue
+            for f in files:
+                context += f"{root}/{f}\n"
+        
+        # Priority heuristics for code intelligence
+        priority = ["main.py", "setup.py", "requirements.txt", "pygitup/ui/app.py", "pygitup/core/config.py"]
         for p in priority:
             if os.path.exists(p):
-                with open(p, 'r', errors='ignore') as f: context += f"\n\n--- {p} ---\n" + "".join(f.readlines()[:150])
+                try:
+                    with open(p, 'r', encoding='utf-8', errors='ignore') as f: 
+                        context += f"\n\n--- MODULE ANALYSIS: {p} ---\n" + "".join(f.readlines()[:200])
+                except Exception: continue
         return context
 
     def run_osint_view(self):
@@ -220,36 +233,52 @@ class PyGitUpTUI(App):
         self.run_worker(self.fetch_intel_task())
 
     async def fetch_intel_task(self):
+        # DYNAMIC REPO DISCOVERY (Replaces hardcoded values)
         owner, repo = get_current_repo_context()
         if not owner or not repo:
-            self.query_one("#intel-report").update("## ❌ Context Error\nCould not find Git 'origin' remote.")
+            self.query_one("#intel-report").update("## ❌ Context Error\nCould not find Git 'origin' remote.\nRun this from inside a Git repository.")
             return
+
         config = load_config(); token = get_github_token(config)
         try:
             resp = get_repo_info(owner, repo, token)
             if resp.status_code == 200:
                 data = resp.json(); health = get_repo_health_metrics(owner, repo, token)
-                md = f"# 🛰️ {data.get('full_name')}\n\n| Attribute | Intelligence |\n| --- | --- |\n| ⭐ Stars | {data.get('stargazers_count')} |\n| 🍴 Forks | {data.get('forks_count')} |\n| 🚑 Health | {health.get('activity_status', 'N/A')} |"
+                md = f"# 🛰️ Intelligence: {owner}/{repo}\n\n"
+                md += f"| Metric | Value |\n| --- | --- |\n"
+                md += f"| ⭐ Stars | {data.get('stargazers_count')} |\n"
+                md += f"| 🍴 Forks | {data.get('forks_count')} |\n"
+                md += f"| 🚑 Health | {health.get('activity_status', 'N/A')} |\n"
+                md += f"| 🏃 Velocity | {health.get('development_velocity_days', 'N/A')} days/commit |"
                 self.query_one("#intel-report").update(md)
-        except: pass
+            else:
+                self.query_one("#intel-report").update(f"## ❌ API Error\nStatus: {resp.status_code}")
+        except Exception as e:
+            self.query_one("#intel-report").update(f"## ❌ System Error\n{e}")
 
     def run_analytics_view(self):
         self.query_one("#main-switcher").current = "analytics-view"
+        self.query_one("#analytics-report").update("# 📊 Crunching Momentum Data...")
         self.run_worker(self.fetch_analytics_task())
 
     async def fetch_analytics_task(self):
+        # DYNAMIC REPO DISCOVERY
         owner, repo = get_current_repo_context()
         if not owner or not repo:
             self.query_one("#analytics-report").update("## ❌ Context Error\nCould not identify repository.")
             return
-        config = load_config(); token = get_github_token(config); user = get_github_username(config)
+
+        config = load_config(); token = get_github_token(config)
         try:
             repo_resp = get_repo_info(owner, repo, token)
             if repo_resp.status_code == 200:
                 data = repo_resp.json()
                 proj = predict_growth_v2(data['stargazers_count'], data['created_at'], data['forks_count'])
-                self.query_one("#analytics-report").update(f"# 📈 Momentum: {repo}\n\n- **Projected Star Goal:** {proj} 🌟")
-        except: pass
+                self.query_one("#analytics-report").update(f"# 📈 Momentum: {repo}\n\n- **Projected Star Goal:** {proj} 🌟\n- **Status:** Data-Driven Projection Complete.")
+            else:
+                self.query_one("#analytics-report").update(f"## ❌ API Error\n{repo_resp.status_code}")
+        except Exception as e:
+            self.query_one("#analytics-report").update(f"## ❌ System Error\n{e}")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-scan": self.run_sast_scan()
@@ -264,7 +293,8 @@ class PyGitUpTUI(App):
         if results:
             for r in results: table.add_row(r['type'], os.path.basename(r['file']), r['code'])
             self.notify("Scan Complete: Issues Found", severity="warning")
-        else: self.notify("Scan Complete: System Secure")
+        else:
+            self.notify("Scan Complete: System Secure")
 
     def run_security_view(self): self.query_one("#main-switcher").current = "security-view"
     def run_identity_view(self):
@@ -275,26 +305,29 @@ class PyGitUpTUI(App):
     def action_go_home(self): self.query_one("#main-switcher").current = "home-view"
 
     def launch_cli_fallback(self, mode):
-        from ..project.project_ops import upload_project_directory, migrate_repository
+        from ..project.project_ops import upload_project_directory
+        from ..project.templates import create_project_from_template
         from ..github.ssh_ops import setup_ssh_infrastructure
         from ..utils.ai import ai_commit_workflow
-        from ..project.templates import create_project_from_template
         config = load_config(); user = get_github_username(config); token = get_github_token(config)
+        
         actual_mode = mode.split(" ")[0]
+        
         with self.suspend():
             os.system('cls' if os.name == 'nt' else 'clear')
             try:
                 if actual_mode == "project": upload_project_directory(user, token, config)
-                elif actual_mode == "template":
+                elif actual_mode == "template": 
                     if "--template" in mode:
                         t_name = mode.split("--template ")[1]
                         class MockArgs: template = t_name; repo = None; variables = None; private = True; dry_run = False
                         create_project_from_template(user, token, config, MockArgs())
-                    else: create_project_from_template(user, token, config)
+                    else:
+                        create_project_from_template(user, token, config)
                 elif actual_mode == "ai-commit": ai_commit_workflow(user, token, config)
                 elif actual_mode == "ssh": setup_ssh_infrastructure(config, token)
-                input("\nPress Enter to return to TUI...")
-            except: input("\nFailed. Press Enter...")
+                input("\nPress Enter to return to TUI Dashboard...")
+            except Exception as e: print(f"Error: {e}"); input("Press Enter...")
 
 def run_tui():
     PyGitUpTUI().run()

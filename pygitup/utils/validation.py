@@ -1,3 +1,4 @@
+
 import re
 import os
 import urllib.parse
@@ -42,6 +43,15 @@ def validate_git_url(url):
     if not url:
         raise ValueError("URL cannot be empty.")
         
+    # Block Git Argument Injection (CVE-2017-1000117 style patterns)
+    if url.startswith("-"):
+        raise ValueError("Security Violation: URL cannot start with a dash.")
+        
+    # Block dangerous SSH options in the URL
+    # Examples: ssh://-oProxyCommand=...
+    if "ProxyCommand" in url or "upload-pack" in url or "receive-pack" in url:
+        raise ValueError("Security Violation: Dangerous SSH options detected.")
+
     # Basic structure check
     if not (url.startswith(('http://', 'https://', 'git@', 'ssh://'))):
         raise ValueError("Invalid Git URL format. Must be HTTP, HTTPS, or SSH.")
@@ -76,4 +86,4 @@ def sanitize_input(text):
     if not text:
         return ""
     # Remove everything except standard alpha-numeric and basic punctuation
-    return re.sub(r'[^a-zA-Z0-9\s._\-()]', '', text)
+    return re.sub(r'[^a-zA-Z0-9\s._\-()\[\]]', '', text)

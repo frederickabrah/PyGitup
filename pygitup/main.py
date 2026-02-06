@@ -2,7 +2,7 @@ import sys
 import os
 
 from .core.args import create_parser
-from .core.config import load_config, get_github_username, get_github_token, configuration_wizard, list_profiles, set_active_profile, get_active_profile_path
+from .core.config import load_config, get_github_username, get_github_token, configuration_wizard, list_profiles, set_active_profile, get_active_profile_path, check_crypto_installed
 from .project.project_ops import upload_project_directory, upload_single_file, upload_batch_files, update_multiple_repos, manage_bulk_repositories, migrate_repository
 from .project.templates import create_project_from_template
 from .github.releases import create_release_tag
@@ -58,6 +58,9 @@ def main():
         
         # Load configuration
         config = load_config(args.config)
+        
+        # Security: Check for encryption library
+        check_crypto_installed()
         
         # Auto-Setup Wizard if credentials missing
         if not config["github"].get("username") or not config["github"].get("token"):
