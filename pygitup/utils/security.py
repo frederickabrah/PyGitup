@@ -1,8 +1,54 @@
 import os
 import ast
 import fnmatch
+import subprocess
 from ..github.api import get_dependabot_alerts, get_secret_scanning_alerts
 from ..utils.ui import print_success, print_error, print_warning, print_info, print_header, Table, box, console
+
+# --- God Tier SSH Keygen ---
+def generate_ssh_key(email):
+    """
+    Generates a new SSH key if one doesn't exist, and returns the public key.
+    Avoids overwriting existing keys.
+    """
+    home_dir = os.path.expanduser("~")
+    ssh_dir = os.path.join(home_dir, ".ssh")
+    key_path = os.path.join(ssh_dir, "pygitup_id_rsa")
+    pub_key_path = f"{key_path}.pub"
+
+    os.makedirs(ssh_dir, exist_ok=True)
+
+    if not os.path.exists(key_path):
+        print_info("No existing 'pygitup_id_rsa' key found. Generating a new one...")
+        try:
+            # Generate the key using ssh-keygen, non-interactively
+            command = [
+                "ssh-keygen",
+                "-t", "rsa",
+                "-b", "4096",
+                "-C", email,
+                "-f", key_path,
+                "-N", ""  # No passphrase
+            ]
+            result = subprocess.run(command, check=True, capture_output=True, text=True)
+            print_success(f"New SSH key generated at {key_path}")
+        except subprocess.CalledProcessError as e:
+            print_error(f"Failed to generate SSH key: {e.stderr}")
+            return None, None
+        except FileNotFoundError:
+            print_error("`ssh-keygen` command not found. Please install an SSH client (like OpenSSH).")
+            return None, None
+    else:
+        print_info(f"Using existing SSH key at {key_path}")
+
+    # Read the public key
+    try:
+        with open(pub_key_path, "r") as f:
+            public_key = f.read().strip()
+        return public_key, key_path
+    except FileNotFoundError:
+        print_error(f"Could not read public key at {pub_key_path}")
+        return None, None
 
 # List of patterns that are usually sensitive or too heavy to upload
 SENSITIVE_PATTERNS = [

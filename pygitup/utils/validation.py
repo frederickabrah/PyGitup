@@ -11,10 +11,28 @@ def validate_repo_name(name):
         return False, "Invalid repository name. Use only alphanumeric characters, dots, underscores, and hyphens."
     return True, ""
 
+def is_safe_path(path):
+    """
+    Ensures the path is within the user's home directory or current working directory.
+    Prevents access to sensitive system areas.
+    """
+    home = os.path.expanduser("~")
+    cwd = os.getcwd()
+    abs_path = os.path.abspath(os.path.expanduser(path))
+    
+    # Allow home directory or current workspace
+    if abs_path.startswith(home) or abs_path.startswith(cwd):
+        return True
+    return False
+
 def validate_file_path(path):
-    """Validates local file paths."""
+    """Validates local file paths with safety checks."""
     if not path:
         return False, "File path cannot be empty."
+    
+    if not is_safe_path(path):
+        return False, "Security Violation: Path is outside authorized workspace."
+        
     if not os.path.exists(path):
         return False, f"File or directory does not exist: {path}"
     return True, ""

@@ -156,70 +156,110 @@ def generate_ai_workflow(api_key, project_name, file_list, code_context=""):
     return msg
 
 def analyze_failed_log(api_key, log_text):
-    # ... (existing code)
+    """Uses AI to find the root cause of a build/test failure."""
+    prompt = f"Analyze this execution log and identify the bug. Provide a concise explanation and a code fix:\n\n{log_text[:8000]}"
     return call_gemini_api(api_key, prompt)
 
-def code_mentor_chat(api_key, query, code_context, history=None):
-    """Uses Gemini as a Code Mentor with session-based memory."""
-    if not api_key: return "API Key missing."
+def ai_diagnostics_workflow(config, command):
+    """Executes a command and uses AI to heal failures."""
+    print_info(f"🚀 Running diagnostic command: {command}")
     
-    if history is None:
-        history = []
+    from .agent_tools import run_shell_tool
+    result = run_shell_tool(command)
+    
+    if "EXIT CODE: 0" in result:
+        print_success("Command passed successfully. No healing required.")
+        return True
+        
+    print_warning("⚠️ Command failed. Initiating AI Diagnosis...")
+    api_key = config["github"].get("ai_api_key")
+    analysis = analyze_failed_log(api_key, result)
+    
+    if analysis:
+        console.print(Panel(analysis, title="AI Root Cause Analysis", border_style="red"))
+        confirm = input("\nWould you like the Agent to attempt a fix? (y/n): ").lower()
+        if confirm == 'y':
+            # In a full implementation, we'd feed this back into the Sentinel Agent loop
+            print_info("🤖 Sentinel Agent is analyzing the codebase to apply the fix...")
+            # For now, we use the existing Agent chat to handle the fix
+            return analysis
+    return False
 
-    # Foundational prompt with codebase context
+from .agent_tools import AGENT_TOOLS_SPEC, execute_agent_tool
+
+def code_mentor_chat(api_key, query, code_context, history=None):
+    """Uses Gemini as an Autonomous Agent with strict token management and rate-limit recovery."""
+    if not api_key: return {"text": "API Key missing.", "tool_calls": []}
+    if history is None: history = []
+
+    # COMPRESSION: Drastically reduce context size to save TPM (Tokens Per Minute)
+    compressed_context = code_context[:1500] 
+    
     system_instruction = f"""
-    You are 'PyGitUp Mentor', an elite Software Architect.
-    
-    KNOWLEDGE BASE (Current Project):
-    {code_context[:8000]}
-    
-    INSTRUCTIONS:
-    1. Answer based on the project context and our ongoing conversation.
-    2. Be technical, direct, and provide production-ready code fixes.
-    3. Maintain continuity in our discussion.
+    You are 'AI Assistant', an autonomous AI Software Engineer.
+    CONTEXT: {compressed_context}
+    CAPABILITIES: File I/O, Git, Shell, GitHub Issues.
+    PROTOCOL: Analyze -> Act -> Verify.
     """
 
-    # Format the multi-turn payload
     contents = []
+    # Prune history to last 5 turns to stay under small TPM limits
+    for msg in history[-5:]:
+        parts = []
+        if msg.get('text'): parts.append({"text": msg['text']})
+        if msg.get('tool_calls'):
+            for tc in msg['tool_calls']:
+                parts.append({"function_call": {"name": tc['name'], "args": tc['args']}})
+        if msg.get('tool_results'):
+            for tr in msg['tool_results']:
+                parts.append({"function_response": {"name": tr['name'], "response": {"content": tr['content']}}})
+        contents.append({"role": "user" if msg['role'] == 'user' else "model", "parts": parts})
     
-    # 1. Inject system instruction as the first user turn if history is empty
-    # or as a prefix to the first message.
-    
-    # 2. Add history
-    for msg in history:
-        contents.append({
-            "role": "user" if msg['role'] == 'user' else "model",
-            "parts": [{"text": msg['text']}]
-        })
-    
-    # 3. Add current query with context enforcement
-    current_text = f"[SYSTEM: Follow architecture guidelines from context]\n{query}" if not history else query
-    contents.append({
-        "role": "user",
-        "parts": [{"text": current_text}]
-    })
+    contents.append({"role": "user", "parts": [{"text": query}]})
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
-    # Note: We use the same tiered fallback logic by calling our centralized caller with the built contents
+    # Model Priority: Use 1.5-flash if 2.0 is highly unstable/throttled
+    models = ["gemini-1.5-flash", "gemini-2.0-flash"]
+    api_versions = ["v1", "v1beta"]
     
-    payload = {
-        "contents": contents,
-        "system_instruction": {"parts": [{"text": system_instruction}]}
-    }
-
-    try:
-        response = requests.post(url, json=payload, timeout=30)
-        if response.status_code == 200:
-            return response.json()['candidates'][0]['content']['parts'][0]['text'].strip()
-        else:
-            # Fallback to 1.5 Pro if 2.5 Flash fails
-            url_fallback = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={api_key}"
-            response = requests.post(url_fallback, json=payload, timeout=30)
-            if response.status_code == 200:
-                return response.json()['candidates'][0]['content']['parts'][0]['text'].strip()
-            return f"Error: {response.status_code}"
-    except Exception as e:
-        return f"Connection error: {e}"
+    for model in models:
+        for version in api_versions:
+            retries = 2
+            backoff = 5 # Start with 5s wait for 429s
+            
+            while retries > 0:
+                url = f"https://generativelanguage.googleapis.com/{version}/models/{model}:generateContent?key={api_key}"
+                try:
+                    # Payload with Tools
+                    payload = {
+                        "contents": contents,
+                        "system_instruction": {"parts": [{"text": system_instruction}]},
+                        "tools": [{"function_declarations": AGENT_TOOLS_SPEC}]
+                    }
+                    
+                    response = requests.post(url, json=payload, timeout=30)
+                    
+                    if response.status_code == 200:
+                        res_data = response.json()
+                        candidate = res_data['candidates'][0]
+                        output_text = ""; tool_calls = []
+                        for part in candidate['content']['parts']:
+                            if 'text' in part: output_text += part['text']
+                            if 'function_call' in part:
+                                tool_calls.append({"name": part['function_call']['name'], "args": part['function_call']['args']})
+                        return {"text": output_text.strip(), "tool_calls": tool_calls}
+                    
+                    elif response.status_code == 429:
+                        time.sleep(backoff)
+                        retries -= 1
+                        backoff *= 2 # 5s, 10s
+                        continue
+                    else:
+                        break # Try next model/version
+                except Exception:
+                    retries -= 1
+                    time.sleep(2)
+                    
+    return {"text": "Google API Quota Exhausted. Please wait a few minutes or use a different API key.", "tool_calls": []}
 
 def ai_commit_workflow(github_username, github_token, config):
     """Orchestrates the AI commit process with auto-staging support."""

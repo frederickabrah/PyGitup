@@ -99,12 +99,17 @@ def request_code_review(github_username, github_token, config, args=None):
             subprocess.run(["git", "add"] + files, check=True)
             print_info(f"Added files to the branch: {files}")
 
-            # Commit the changes
-            commit_message = f"Code review request for: {', '.join(files)}"
-            subprocess.run(["git", "commit", "-m", commit_message], check=True)
-            print_info("Committed changes to the branch.")
+            # Check if there are changes to commit
+            status_check = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True).stdout.strip()
+            if status_check:
+                # Commit the changes
+                commit_message = f"Code review request for: {', '.join(files)}"
+                subprocess.run(["git", "commit", "-m", commit_message], check=True)
+                print_info("Committed changes to the branch.")
+            else:
+                print_warning("No changes detected in the specified files relative to the current branch.")
 
-        # Push the new branch to GitHub
+        # Push the new branch to GitHub (even if no new commit, in case branch is new)
         subprocess.run(["git", "push", "-u", "origin", branch_name], check=True)
         print_info("Pushed the new branch to GitHub.")
 

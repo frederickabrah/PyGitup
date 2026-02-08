@@ -84,28 +84,35 @@ def get_master_key(salt):
     return _SESSION_KEY
 
 def encrypt_data(data, salt):
-    """Encrypts sensitive data with a password-derived key."""
+    """Encrypts sensitive data with a password-derived key. Requires cryptography."""
     if not data: return ""
     if HAS_CRYPTO:
-        key = get_master_key(salt)
-        f = Fernet(key)
-        return f.encrypt(data.encode()).decode()
+        try:
+            key = get_master_key(salt)
+            f = Fernet(key)
+            return f.encrypt(data.encode()).decode()
+        except Exception as e:
+            print_error(f"Encryption failed: {e}")
+            return ""
     else:
-        return base64.b64encode(data.encode()).decode()
+        print_error("CRITICAL: 'cryptography' library missing. Cannot encrypt sensitive data.")
+        print_info("Install it now: pip install cryptography")
+        raise RuntimeError("Insecure storage attempt blocked.")
 
 def decrypt_data(data, salt):
-    """Decrypts sensitive data with a password-derived key."""
+    """Decrypts sensitive data with a password-derived key. Requires cryptography."""
     if not data: return ""
     if not HAS_CRYPTO:
-        try: return base64.b64decode(data.encode()).decode()
-        except: return data
+        print_error("CRITICAL: 'cryptography' library missing. Cannot decrypt sensitive data.")
+        return ""
 
     try:
         key = get_master_key(salt)
         f = Fernet(key)
         return f.decrypt(data.encode()).decode()
     except Exception:
-        print_error("Decryption failed. Wrong password or corrupted data.")
+        # Don't print error here to avoid noise during background loads,
+        # but return empty to signify failure.
         return ""
 
 def get_config_dir():

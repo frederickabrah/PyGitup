@@ -74,13 +74,20 @@ def display_repo_info(data):
     grid.add_column(justify="left", style="cyan", no_wrap=True)
     grid.add_column(justify="left", style="white")
 
+    # Handle License object safely
+    license_name = "None"
+    if data.get("license"):
+        license_name = data.get("license", {}).get("name", "Unknown")
+
     fields = {
         "Name": data.get("name"),
         "Owner": data.get("owner", {}).get("login"),
         "Visibility": "Private" if data.get("private") else "Public",
         "Language": data.get("language"),
+        "License": license_name,
         "Stars": str(data.get("stargazers_count")),
         "Forks": str(data.get("forks_count")),
+        "Watchers": str(data.get("subscribers_count", "N/A")), # API calls it subscribers_count
         "Issues": f"{data.get('open_issues_count')} open",
         "Created": data.get("created_at"),
         "Clone URL": data.get("clone_url"),
@@ -88,11 +95,24 @@ def display_repo_info(data):
         "Sponsors": "💖 Active" if data.get("is_sponsored") else "None"
     }
 
+    if data.get("scraped_contributors"):
+        fields["Contributors"] = data.get("scraped_contributors")
+
+    if data.get("homepage"):
+        fields["Homepage"] = data.get("homepage")
+
     if data.get("topics"):
         fields["Topics"] = ", ".join(data.get("topics"))
 
     for label, value in fields.items():
         grid.add_row(f"{label}:", str(value))
+
+    # OSINT: Social Links
+    if data.get('social_links'):
+        grid.add_row("", "")
+        grid.add_row("[bold]Digital Footprint[/bold]", "")
+        for platform, url in data['social_links'].items():
+            grid.add_row(f"{platform}:", url)
 
     # OSINT: Languages Section
     if 'osint_languages' in data and data['osint_languages']:
@@ -120,9 +140,12 @@ def display_repo_info(data):
     if 'osint_release' in data and data['osint_release']:
         rel = data['osint_release']
         grid.add_row("", "")
-        grid.add_row("[bold]Latest Intelligence[/bold]", "")
+        grid.add_row("[bold]Latest Release (API)[/bold]", "")
         grid.add_row("Version:", f"{rel.get('tag_name')} ({rel.get('name')})")
         grid.add_row("Released:", rel.get('published_at', '')[:10])
+    elif data.get('scraped_release'):
+        grid.add_row("", "")
+        grid.add_row("[bold]Latest Release (Scraped)[/bold]", data.get('scraped_release'))
 
     # Health & Activity Section
     if 'health' in data and data['health']:
