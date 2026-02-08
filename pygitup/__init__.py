@@ -1,2 +1,2 @@
-__version__ = "2.2.1"
-# PyGitUp: Engineered for Truth. Context-Aware Intelligence. 🛡️🚀
+__version__ = "2.3.0"
+# PyGitUp: Professional GitHub Automation & AI Command Center. 🛡️🚀

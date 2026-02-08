@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='pygitup',
-    version='2.2.1',
+    version='2.3.0',
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
@@ -12,6 +12,7 @@ setup(
         'pip-audit',
         'inquirer',
         'rich',
+        'textual',
         'beautifulsoup4',
         'pytest' # For development/testing purposes
     ],
