@@ -1,0 +1,5 @@
+defaults:
+  branch: develop
+  commit_message: Test commit message
+github:
+  username: testuser

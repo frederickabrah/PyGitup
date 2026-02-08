@@ -193,6 +193,18 @@ def delete_repo_api(username, repo_name, token):
     url = f"https://api.github.com/repos/{username}/{repo_name}"
     return github_request("DELETE", url, token)
 
+# --- SOCIAL AUTOMATION ENDPOINTS ---
+
+def star_repo(owner, repo, token):
+    """Star a GitHub repository."""
+    url = f"https://api.github.com/user/starred/{owner}/{repo}"
+    return github_request("PUT", url, token)
+
+def follow_user(target_username, token):
+    """Follow a GitHub user."""
+    url = f"https://api.github.com/user/following/{target_username}"
+    return github_request("PUT", url, token)
+
 # --- ADVANCED ENHANCEMENT ENDPOINTS ---
 
 def get_workflow_run_logs(username, repo_name, token, run_id):

@@ -39,23 +39,36 @@ def calculate_resolution_time(issues):
         
     return round(total_hours / len(closed_issues), 1)
 
-def predict_growth_v2(current_stars, created_at_str, forks):
-    """Trend-based growth prediction factoring in velocity and viral potential."""
+def predict_growth_v2(current_stars, created_at_str, forks, health_score=None):
+    """
+    Sophisticated growth prediction factoring in velocity, maintenance health, and momentum.
+    """
     try:
         created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
         days_old = (datetime.now(created_at.tzinfo) - created_at).days
         if days_old <= 0: return current_stars
         
-        # Velocity Calculation
+        # 1. Historical Velocity (Stars per day)
         base_rate = current_stars / days_old
         
-        # Multipliers
-        fork_multiplier = 1 + (forks / (current_stars + 1))
-        # As projects get older, growth usually accelerates or decays. 
-        # We assume a slight 'Compound Interest' for healthy repos.
-        acceleration = 1.1 if base_rate > 0.1 else 1.0
+        # 2. Viral/Utility Factor (Fork density)
+        # High forks usually correlate with future star growth
+        fork_momentum = 1 + (forks / (current_stars + 1))
         
-        prediction_90_days = int(current_stars + (base_rate * 90 * fork_multiplier * acceleration))
+        # 3. Maintenance Multiplier (Health drag)
+        # If health_score is low, growth is often stifled by bugs/unresponsiveness
+        health_multiplier = 1.0
+        if health_score:
+            health_multiplier = 0.5 + (health_score / 100) # Range 0.5 - 1.5
+        
+        # 4. Acceleration (The 'Network Effect')
+        # We assume growth accelerates if the project is already gaining traction
+        acceleration = 1.2 if base_rate > 0.5 else 1.05
+        
+        # Calculation: Current + (Anticipated Daily Rate * 90 Days)
+        projected_daily = base_rate * fork_momentum * health_multiplier * acceleration
+        prediction_90_days = int(current_stars + (projected_daily * 90))
+        
         return max(current_stars, prediction_90_days)
     except Exception:
         return current_stars
@@ -107,10 +120,10 @@ def generate_analytics(github_username, github_token, config, args=None):
         closed_issues_count = len([i for i in issues if i['state'] == 'closed'])
         avg_res_hours = calculate_resolution_time(issues)
 
-        # 3. Predictive Modeling (v2)
-        predicted_stars = predict_growth_v2(stars, repo_data['created_at'], forks)
+        # 3. Intelligence Modeling (v2)
         health_score = calculate_health_score(stars, forks, open_issues_count, closed_issues_count)
-
+        predicted_stars = predict_growth_v2(stars, repo_data['created_at'], forks, health_score=health_score)
+        
         # 4. Contributor Impact Analysis
         contrib_resp = get_contributors(github_username, repo_name, github_token)
         contributors = contrib_resp.json() if contrib_resp.status_code == 200 else []

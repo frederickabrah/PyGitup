@@ -162,10 +162,31 @@ def get_detailed_repo_info(args, github_token):
             full_url = f"https://github.com/{owner}/{repo_name}"
             scraped_intel = scrape_repo_info(full_url)
             if scraped_intel:
+                # Merge unique OSINT data
                 repo_data['used_by'] = scraped_intel.get('used_by')
                 repo_data['is_sponsored'] = scraped_intel.get('is_sponsored')
-                repo_data['topics'] = scraped_intel.get('topics', [])
+                repo_data['topics'] = scraped_intel.get('topics', []) or repo_data.get('topics', [])
                 repo_data['social_preview'] = scraped_intel.get('social_preview')
+                
+                # Enhanced fields
+                if scraped_intel.get('watchers_count') and scraped_intel.get('watchers_count') != "N/A":
+                    repo_data['subscribers_count'] = scraped_intel.get('watchers_count') # Map to API field name
+                
+                if scraped_intel.get('contributors_count'):
+                    repo_data['scraped_contributors'] = scraped_intel.get('contributors_count')
+                    
+                if scraped_intel.get('social_links'):
+                    repo_data['social_links'] = scraped_intel.get('social_links')
+
+                if scraped_intel.get('homepage'):
+                     repo_data['homepage'] = scraped_intel.get('homepage')
+
+                if scraped_intel.get('license') and not repo_data.get('license'):
+                     repo_data['license'] = scraped_intel.get('license')
+
+                if scraped_intel.get('latest_release'):
+                     repo_data['scraped_release'] = scraped_intel.get('latest_release')
+
         except Exception:
             pass
 

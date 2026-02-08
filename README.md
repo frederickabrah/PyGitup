@@ -6,83 +6,70 @@
  | |__) |   | |  __ _| |_| | | |_ __  
  |  ___/    | | |_ | | __| | | | '_ \ 
  | |     _  | |__| | | |_| |_| | |_) |
- |_|    (_)  \_____|_|\__|\___/| .__/ 
+ |_|    (_)  \_____|_|\__|_|\___/| .__/ 
                                | |    
                                |_|    
 ```
 
-I got tired of typing the same 10 Git commands every time I started a new project or wanted to push a quick fix. So, I built **PyGitUp**. It's a CLI tool that actually makes sense—it handles the repetitive stuff, keeps your history clean, and makes sure you don't do anything stupid (like pushing your `.env` file).
+PyGitUp is a professional CLI & TUI command center for GitHub automation. It streamlines the repetitive aspects of the Git lifecycle, enforces security best practices, and provides data-driven insights into your repositories.
 
 ---
 
-## What does it actually do?
+## Core Capabilities
 
-PyGitUp is basically a dashboard for your terminal. It’s got 26 modes, but here are the ones you'll actually use:
+PyGitUp provides a robust suite of automation and intelligence tools:
 
-*   **Project Upload:** Forget `git init`, `git add`, `git commit`... this does it all in one go and creates the GitHub repo for you.
-*   **Smart Push:** If you're like me and have 50 "fix typo" commits, this squashes them into one clean commit before pushing. Your history stays pretty.
-*   **The Security Lock:** It actively scans your files before uploading. If it sees a `.env`, `node_modules`, or `venv`, it stops and asks you what you're doing. 
-*   **Auto-Docs:** It literally reads your Python/JS/Java code and builds a documentation site for you. It uses AST parsing, so it's actually smart about it.
-*   **Traffic Stats:** Want to see who's cloning your repo or where they're coming from? Option 25 gives you a full breakdown of views and referrers.
-*   **Offline Mode:** If your internet is trash, queue your commits locally. The second you're back online, run the sync and they're gone.
-
----
-
-## 📺 The PyGitUp Immersive TUI Dashboard
-
-Welcome to the future of GitHub management. PyGitUp features a full **Text User Interface (TUI)** command center (Option 34).
-
-*   **Intelligence Hub:** Real-time OSINT reconnaissance and repository health.
-*   **Neural Code Mentor:** An AI pair-programmer that knows your local codebase.
-*   **Sentinel SAST:** Native, real-time vulnerability and secret scanning.
-*   **Template Marketplace:** One-click deployment of production-ready architectures.
+*   **Repository Automation:** Streamlines initialization, remote synchronization, and deployment into single-command workflows.
+*   **AI Assistant (Autonomous):** A full-stack AI engineer capable of reading code, writing fixes, and executing system tasks natively.
+*   **AI Diagnostic Loop:** A functional self-healing system that executes commands (like tests), analyzes failures, and proposes direct code repairs.
+*   **Security Sentinel:** AST-based static analysis (SAST) to detect command injections, hardcoded secrets, and sensitive file exposures.
+*   **Predictive Analytics:** Data-driven growth forecasting based on engagement velocity, fork density, and maintenance health.
+*   **Digital Footprint (OSINT):** Deep repository reconnaissance, extracting social metadata, digital footprints, and hidden community metrics.
+*   **Smart Push & Release:** AI-powered conventional commit generation and professional release management with automated changelogs.
 
 ---
 
-## How to get it running
+## 📺 Immersive TUI Dashboard
+
+PyGitUp features a comprehensive **Text User Interface (TUI)** for developers who prefer a graphical terminal experience (Option 34).
+
+*   **Engineering Hub:** Manage project context, active profiles, and autonomous AI tasks.
+*   **Intelligence Center:** Real-time data visualization for repository stats and trends.
+*   **Native Operations:** Manage Pull Requests, Gists, and SSH keys through dedicated, immersive views.
+
+---
+
+## Installation & Setup
 
 ```bash
-# Clone it
+# Clone the repository
 git clone https://github.com/frederickabrah/PyGitUp.git
 cd PyGitUp
 
-# Grab the dependencies
+# Install dependencies and package in editable mode
 pip install -r requirements.txt
+pip install -e .
 
-# Run the interactive menu
+# Launch the interface
 python pygitup.py
 ```
 
 ---
 
-## Let's be real (The Truth)
+## Transparency & Security
 
-I'm not trying to sell you a miracle. Here’s what you should know:
-1.  **It’s a Wrapper:** This tool needs Git installed on your system. It’s just running the commands for you so you don't have to remember the flags.
-2.  **No Magic Docs:** If your code has zero docstrings, the "Auto-Docs" feature is going to generate a very empty folder. You still have to document your code.
-3.  **Local Tokens:** Your GitHub token is stored in a local `.yaml` file. I don't see it, nobody else sees it. It stays on your machine.
+*   **Security First:** PyGitUp enforces encrypted credential storage using the `cryptography` library. It refuses to store tokens in insecure formats.
+*   **Safe Execution:** All system calls are audited to prevent command injection. Path validation is enforced to block traversal attempts.
+*   **Community Integration:** To support the project's growth, PyGitUp includes a community integration feature that ensures users follow the project development and star the repository upon initial use.
+*   **Local Privacy:** All GitHub tokens and AI keys are stored locally on your machine. No telemetry or sensitive data is ever transmitted to external servers except for direct GitHub API interactions.
 
 ---
 
-## ❤️ Sponsor the Project: Fuel the Machine!
+## ❤️ Support the Project
 
-Let's be honest, `PyGitUp` is the digital equivalent of a Swiss Army knife for your GitHub workflow. It slices, it dices, it saves you from the existential dread of a `git push --force` gone wrong on a Friday afternoon. We've all been there.
+PyGitUp is an open-source project maintained for the developer community. If this tool enhances your productivity, consider supporting its development.
 
-This tool is, and always will be, **free**.
-
-However, it is not fueled by good intentions alone. The `PyGitUp` development engine runs on a delicate, high-performance mixture of caffeine, sleep deprivation, and the sheer terror of disappointing its users. It's a miracle of engineering, really.
-
-**If `PyGitUp` has saved you time, sanity, or even just a few frantic Google searches, consider becoming a sponsor.**
-
-Think of it less as a donation and more as a strategic investment in your own future productivity. Your sponsorship directly translates into:
-
-*   **More Features:** I have a roadmap longer than a `git log` on a decade-old project.
-*   **Fewer Bugs:** Every bug squashed is a victory for developer sanity.
-*   **The Ultimate Fuel:** Coffee. Lots and lots of coffee. You provide the caffeine, I provide the code that makes your life easier.
-
-**[➡️ Become a GitHub Sponsor!](https://github.com/sponsors/frederickabrah)**
-
-**[☕ Buy Me a Coffee](https://www.buymeacoffee.com/frederickabrah)**
+**[➡️ Support on GitHub](https://github.com/sponsors/frederickabrah)**
 
 ---
 
