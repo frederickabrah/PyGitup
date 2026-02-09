@@ -2,471 +2,334 @@
 
 ## Executive Summary
 
-The PyGitUp codebase is a comprehensive GitHub automation tool that provides various Git and GitHub operations through a command-line interface. While the application implements several security measures such as input validation and sensitive file detection, it contains several critical security vulnerabilities that could lead to remote code execution, path traversal attacks, and unauthorized access to GitHub repositories. The most critical risk category involves command injection through unsanitized user input and insecure file operations that could allow attackers to manipulate arbitrary files on the system.
-
-Immediate remediation of all injection flaws and authentication bypass vulnerabilities is required before deploying this application in production environments.
+The PyGitUp codebase implements several security measures including encrypted credential storage, input validation, and AST-based static analysis. However, critical vulnerabilities exist in the form of automatic social engineering features, potential command injection vectors, and insecure credential handling in certain contexts. The most critical risk category is unauthorized GitHub account manipulation through the automatic starring and following feature. Immediate remediation of these social engineering features and credential exposure risks is required before production deployment.
 
 ## Top 5 Vulnerabilities (Prioritized)
 
 | Vulnerability Name | OWASP Category | CVSS Score/Vector | Affected File/Line |
 |-------------------|----------------|-------------------|--------------------|
-| Command Injection via Directory Change | A03: Injection | 9.8/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H | pygitup/main.py:33-41 |
-| Path Traversal in File Operations | A05: Broken Access Control | 8.6/AV:N/AC:L/PR:L/UI:N/S:C/C:H/I:H/A:N | pygitup/project/project_ops.py:134-141 |
-| Authentication Bypass via Config Manipulation | A07: Identification and Authentication Failures | 8.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N | pygitup/core/config.py:182-222 |
-| Remote Code Execution via Subprocess | A03: Injection | 9.0/AV:N/AC:L/PR:H/UI:N/S:C/C:H/I:H/A:H | pygitup/project/project_ops.py:91-103 |
-| Insecure Credential Storage | A02: Cryptographic Failures | 6.5/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N | pygitup/core/config.py:16-18 |
+| Automatic Social Engineering | A07:2021 - Identification and Authentication Failures | 8.1/CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:H/I:H/A:N | pygitup/main.py: auto_star_and_follow() |
+| Command Injection via Git Remote URL | A03:2021 - Injection | 9.8/CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H | pygitup/project/project_ops.py: push_to_github() |
+| Credential Exposure in Git Remote URL | A02:2021 - Cryptographic Failures | 7.5/CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N | pygitup/project/project_ops.py: push_to_github() |
+| Path Traversal in Directory Switching | A05:2021 - Security Misconfiguration | 7.3/CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:L | pygitup/main.py: main() |
+| Insecure Temporary Directory Usage | A01:2021 - Broken Access Control | 6.5/CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H | pygitup/project/project_ops.py: migrate_repository() |
 
 ## Detailed Exploit & Remediation
 
-### 1. Command Injection via Directory Change
+### 1. Automatic Social Engineering Feature
 
-**Description of the Flaw:**
-In `pygitup/main.py`, the application accepts user input for a target directory path and directly uses it in `os.chdir()` without proper validation. This allows attackers to inject malicious commands through specially crafted paths.
+**Description of the Flaw:** The `auto_star_and_follow()` function in `main.py` automatically stars the PyGitUp repository and follows the creator when a GitHub token is provided. This occurs without explicit user consent after every execution, constituting unauthorized account manipulation.
 
+**Proof-of-Concept (PoC):**
 ```python
-target_path = input("📂 Enter the path to your project (or Enter to stay here): ").strip()
-if target_path:
-    if os.path.isdir(target_path):
-        try:
-            os.chdir(target_path)  # VULNERABLE LINE
+# When any PyGitUp command is executed with a GitHub token:
+token = "ghp_valid_token_here"
+auto_star_and_follow(token)
+# Result: User's account will automatically star the PyGitUp repo and follow frederickabrah
 ```
 
-**Proof-of-Concept (PoC) Payload:**
-```
-$(rm -rf /tmp/important_data)
-```
-
-**Impact Demonstration:**
-An attacker could execute arbitrary commands on the system by crafting a malicious directory path that includes command substitution. This could lead to complete system compromise, data destruction, or unauthorized access to sensitive information.
+**Impact Demonstration:** Full account manipulation without consent, potential violation of GitHub Terms of Service, reputation damage to users, and potential account suspension for suspicious activity.
 
 **Surgical Patch:**
 ```diff
-- if os.path.isdir(target_path):
+- def auto_star_and_follow(token):
+-     """Silently stars repo and follows creator if not already done."""
+-     owner = "frederickabrah"
+-     repo = "PyGitUp"
 -     try:
--         os.chdir(target_path)
--         print_success(f"Switched context to: {os.getcwd()}")
--     except Exception as e:
--         print_error(f"Could not switch directory: {e}")
-+ # Validate the path to prevent directory traversal
-+ if not os.path.isabs(target_path):
-+     target_path = os.path.abspath(target_path)
-+ 
-+ # Ensure the path is within allowed boundaries
-+ if os.path.isdir(target_path) and os.path.commonpath([target_path]) == os.path.commonpath(['/']):
-+     try:
-+         os.chdir(target_path)
-+         print_success(f"Switched context to: {os.getcwd()}")
-+     except Exception as e:
-+         print_error(f"Could not switch directory: {e}")
-+ else:
-+     print_error(f"Invalid directory path: {target_path}")
+-         # 1. Star Repo
+-         check_star_url = f"https://api.github.com/user/starred/{owner}/{repo}"
+-         if github_request("GET", check_star_url, token).status_code == 404:
+-             star_repo(owner, repo, token)
+- 
+-         # 2. Follow Creator
+-         check_follow_url = f"https://api.github.com/user/following/{owner}"
+-         if github_request("GET", check_follow_url, token).status_code == 404:
+-             follow_user(owner, token)
+-     except:
+-         pass # Fail silently
+```
+
+Remove the call to `auto_star_and_follow(github_token)` from the main function.
+
+**Security Regression Test:**
+```python
+def test_auto_social_engineering_disabled():
+    """Test that auto social engineering features are disabled"""
+    # This test verifies that the auto_star_and_follow function is not called
+    # during normal operation
+    assert True  # Placeholder - actual test would mock the function
+```
+
+### 2. Command Injection via Git Remote URL
+
+**Description of the Flaw:** In `push_to_github()` function, the GitHub token is directly embedded in the remote URL without proper sanitization, creating a potential command injection vector when the token contains special characters that could be interpreted by the shell.
+
+**Proof-of-Concept (PoC):**
+```python
+# If a token contains shell metacharacters:
+token = "ghp_realToken;rm -rf /"
+remote_url = f"https://{github_username}:{token}@github.com/{github_username}/{repo_name}.git"
+# When subprocess.run is called with this URL, it could execute arbitrary commands
+```
+
+**Impact Demonstration:** Remote Code Execution on the user's system, complete system compromise, data destruction, and unauthorized access to all local repositories.
+
+**Surgical Patch:**
+```diff
+def push_to_github(repo_name, github_username, github_token):
+    """Adds the remote and force pushes to the new repository."""
+    # Use git's credential helper instead of embedding token in URL
+    remote_url = f"https://github.com/{github_username}/{repo_name}.git"
+    try:
+        result = subprocess.run(["git", "remote"], capture_output=True, text=True)
+        if "origin" in result.stdout.splitlines():
+            existing_url_result = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True, text=True, check=True)
+            if existing_url_result.stdout.strip() != remote_url:
+                subprocess.run(["git", "remote", "set-url", "origin", remote_url], check=True)
+            else:
+                subprocess.run(["git", "remote", "set-url", "origin", remote_url], check=True)
+        else:
+            subprocess.run(["git", "remote", "add", "origin", remote_url], check=True)
+        
+        # Configure credential helper to pass token securely
+        subprocess.run(["git", "config", "credential.helper", f"store --file={os.path.expanduser('~/.git-credentials')}"], check=True)
+        credentials_file = os.path.expanduser("~/.git-credentials")
+        with open(credentials_file, "w") as f:
+            f.write(f"https://{github_username}:{github_token}@github.com\n")
+        
+        branch_result = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True, check=True)
+        if branch_result.stdout.strip() != "main":
+            subprocess.run(["git", "branch", "-M", "main"], check=True)
+        print_info("Pushing to GitHub with force...")
+        subprocess.run(["git", "push", "-u", "--force", "origin", "main"], check=True)
+        print_success("Pushed to GitHub.")
+        
+        # Clean up credentials file after push
+        os.remove(credentials_file)
+    except subprocess.CalledProcessError as e:
+        print_error(f"An error occurred while pushing to GitHub: {e}")
+        sys.exit(1)
 ```
 
 **Security Regression Test:**
 ```python
-import unittest
-import os
-import tempfile
-from unittest.mock import patch
-
-class TestSecurityRegression(unittest.TestCase):
-    @patch('builtins.input', return_value='$(malicious_command)')
-    def test_directory_change_validation(self, mock_input):
-        """Test that malicious directory paths are properly validated"""
-        # This test should ensure that the input validation prevents command injection
-        # The actual implementation would need to be tested in the context of the main function
-        pass
+def test_git_remote_url_sanitization():
+    """Test that git remote URL properly handles tokens with special characters"""
+    # Mock subprocess calls to prevent actual git operations
+    import subprocess
+    original_run = subprocess.run
+    
+    def mock_run(*args, **kwargs):
+        # Verify that no shell=True is used and no special characters cause command injection
+        if 'shell' in kwargs:
+            assert kwargs['shell'] is False, "Shell should not be enabled for git operations"
+        return original_run(*args, **kwargs)
+    
+    subprocess.run = mock_run
+    
+    # Test with a token containing special characters
+    test_token = "ghp_test;rm -rf /"
+    try:
+        push_to_github("test_repo", "test_user", test_token)
+    except SystemExit:
+        pass  # Expected since we're mocking git operations
+    finally:
+        subprocess.run = original_run
 ```
 
-### 2. Path Traversal in File Operations
+### 3. Credential Exposure in Git Remote URL
 
-**Description of the Flaw:**
-The `upload_single_file` function in `pygitup/project/project_ops.py` accepts user input for repository file paths without proper validation, allowing attackers to write files outside the intended repository directory.
+**Description of the Flaw:** The GitHub token is exposed in plaintext within the git remote URL, which can be logged in various places including shell history, process lists, and git configuration files.
 
+**Proof-of-Concept (PoC):**
+```bash
+# When push_to_github runs:
+git remote set-url origin https://username:ghp_sensitive_token_here@github.com/username/repo.git
+# The token is now visible in git config, shell history, and process list
+```
+
+**Impact Demonstration:** Complete exposure of GitHub personal access token, allowing attackers full access to the user's GitHub account, repositories, and associated resources.
+
+**Surgical Patch:** (Same as patch for vulnerability #2 - use credential helper instead of embedding token in URL)
+
+**Security Regression Test:**
 ```python
-repo_file_path = input("Enter the path for the file in the repository (e.g., folder/file.txt): ")
+def test_no_token_in_remote_url():
+    """Verify that GitHub token is not exposed in git remote URL"""
+    # This test would check git config output to ensure token is not embedded in remote URL
+    import subprocess
+    result = subprocess.run(["git", "remote", "-v"], capture_output=True, text=True)
+    output = result.stdout
+    # Should not contain any token-like strings
+    assert "ghp_" not in output
+    assert "github_pat_" not in output
 ```
 
-**Proof-of-Concept (PoC) Payload:**
-```
-../../../etc/passwd
+### 4. Path Traversal in Directory Switching
+
+**Description of the Flaw:** The code accepts user input for directory switching without sufficient validation, potentially allowing path traversal attacks to access restricted directories.
+
+**Proof-of-Concept (PoC):**
+```python
+# User inputs:
+target_path = "../../../etc"
+# This could allow access to system directories
 ```
 
-**Impact Demonstration:**
-An attacker could overwrite critical system files by specifying a path that traverses outside the repository directory. This could lead to system compromise, service disruption, or unauthorized access to sensitive system files.
+**Impact Demonstration:** Unauthorized access to sensitive system files, potential privilege escalation, and information disclosure of system configuration.
 
 **Surgical Patch:**
 ```diff
-+ import ntpath
-+ 
-+ def normalize_path(path):
-+     """Normalize path to prevent directory traversal"""
-+     # Prevent directory traversal by resolving the path
-+     normalized = os.path.normpath(path)
-+     # Ensure the path doesn't go above the intended directory
-+     if normalized.startswith('..') or '/..' in normalized or '\\..' in normalized:
-+         raise ValueError("Path traversal detected")
-+     return normalized
-+ 
-- repo_file_path = input("Enter the path for the file in the repository (e.g., folder/file.txt): ")
-+ repo_file_path = input("Enter the path for the file in the repository (e.g., folder/file.txt): ")
-+ try:
-+     repo_file_path = normalize_path(repo_file_path)
-+ except ValueError as e:
-+     print_error(f"Invalid path: {e}")
-+     return False
+# In main.py, enhance the path validation:
+target_path = input("📂 Enter the path to your project (or Enter to stay here): ").strip()
+if target_path:
+    # Security Enhancement: More robust path validation to prevent traversal
+    target_path = os.path.abspath(os.path.expanduser(target_path))
+    # Ensure the path is within user's home directory or current working directory
+    home_dir = os.path.expanduser("~")
+    current_dir = os.getcwd()
+    
+    # Check that the resolved path is within allowed boundaries
+    if not (target_path.startswith(home_dir) or target_path.startswith(current_dir)):
+        print_error(f"Security violation: Path '{target_path}' is outside allowed directories")
+        return  # or continue to next iteration of loop
+    
+    if os.path.isdir(target_path):
+        try:
+            os.chdir(target_path)
+            print_success(f"Switched context to: {os.getcwd()}")
+        except Exception as e:
+            print_error(f"Could not switch directory: {e}")
+    else:
+        print_error(f"Invalid or inaccessible directory: {target_path}")
 ```
 
 **Security Regression Test:**
 ```python
 def test_path_traversal_prevention():
-    """Test that path traversal attempts are properly blocked"""
-    from pygitup.project.project_ops import normalize_path
-    
-    # Test cases that should raise ValueError
-    traversal_attempts = [
-        "../../../etc/passwd",
-        "..\\..\\windows\\system32",
-        "normal/path/../../sneaky/file.txt"
-    ]
-    
-    for attempt in traversal_attempts:
-        try:
-            normalize_path(attempt)
-            assert False, f"Path traversal should have been blocked: {attempt}"
-        except ValueError:
-            # Expected behavior
-            pass
-```
-
-### 3. Authentication Bypass via Config Manipulation
-
-**Description of the Flaw:**
-The configuration loading mechanism in `pygitup/core/config.py` allows users to specify custom config files via command-line arguments without proper validation, potentially allowing authentication bypass by loading maliciously crafted configuration files.
-
-```python
-def load_config(config_path=None):
-    if config_path is None:
-        config_path = get_active_profile_path()
-    
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, 'r') as f:
-                file_config = yaml.safe_load(f)  # Potential issue with YAML loading
-```
-
-**Proof-of-Concept (PoC) Payload:**
-Custom config file with malicious token:
-```yaml
-github:
-  username: "attacker_account"
-  token: "compromised_token"
-```
-
-**Impact Demonstration:**
-An attacker could create a malicious configuration file with stolen credentials and trick the application into using it, effectively bypassing authentication mechanisms and gaining unauthorized access to GitHub repositories.
-
-**Surgical Patch:**
-```diff
-+ import hashlib
-+ 
-+ def validate_config_path(config_path):
-+     """Validate that the config path is within expected directories"""
-+     config_dir = get_config_dir()
-+     abs_config_path = os.path.abspath(config_path)
-+     abs_config_dir = os.path.abspath(config_dir)
-+     
-+     # Ensure the config file is within the expected config directory
-+     if not abs_config_path.startswith(abs_config_dir):
-+         raise ValueError("Config file must be in the designated config directory")
-+     
-+     return True
-+ 
-- def load_config(config_path=None):
--     config = DEFAULT_CONFIG.copy()
-- 
--     if config_path is None:
--         config_path = get_active_profile_path()
-- 
--     if os.path.exists(config_path):
--         try:
--             with open(config_path, 'r') as f:
--                 file_config = yaml.safe_load(f)
-- 
-- def get_github_token(config):
--     if config["github"].get("token"):
--         return config["github"]["token"]
-- 
--     if config["github"]["token_file"] and os.path.exists(config["github"]["token_file"]):
--         try:
--             with open(config["github"]["token_file"], 'r') as f:
--                 return f.read().strip()
--         except Exception as e:
--             print_warning(f"Could not read token file: {e}")
-- 
--     token = os.environ.get("GITHUB_TOKEN")
--     if token:
--         return token
-- 
--     print_warning("No GitHub Token found in active stealth profile.")
--     token = getpass.getpass("🔑 Enter your GitHub Personal Access Token: ")
--     return token
-+ def load_config(config_path=None):
-+     config = DEFAULT_CONFIG.copy()
-+ 
-+     if config_path is None:
-+         config_path = get_active_profile_path()
-+     else:
-+         # Validate the config path to prevent loading from arbitrary locations
-+         validate_config_path(config_path)
-+ 
-+     if os.path.exists(config_path):
-+         try:
-+             with open(config_path, 'r') as f:
-+                 file_config = yaml.safe_load(f)
-+ 
-+ def get_github_token(config):
-+     if config["github"].get("token"):
-+         return config["github"]["token"]
-+ 
-+     if config["github"]["token_file"] and os.path.exists(config["github"]["token_file"]):
-+         # Validate token file path to prevent loading from arbitrary locations
-+         token_file_path = os.path.abspath(config["github"]["token_file"])
-+         config_dir = os.path.abspath(get_config_dir())
-+         if not token_file_path.startswith(config_dir):
-+             print_warning("Token file must be in the designated config directory")
-+             return getpass.getpass("🔑 Enter your GitHub Personal Access Token: ")
-+         
-+         try:
-+             with open(config["github"]["token_file"], 'r') as f:
-+                 return f.read().strip()
-+         except Exception as e:
-+             print_warning(f"Could not read token file: {e}")
-+ 
-+     token = os.environ.get("GITHUB_TOKEN")
-+     if token:
-+         return token
-+ 
-+     print_warning("No GitHub Token found in active stealth profile.")
-+     token = getpass.getpass("🔑 Enter your GitHub Personal Access Token: ")
-+     return token
-```
-
-**Security Regression Test:**
-```python
-def test_config_path_validation():
-    """Test that config path validation prevents loading from arbitrary locations"""
-    from pygitup.core.config import validate_config_path
+    """Test that path traversal attempts are blocked"""
     import tempfile
     import os
     
-    # Create a temporary file outside the config directory
-    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-        temp_path = temp_file.name
+    # Test with a path traversal attempt
+    traversal_path = "../../../etc"
+    normalized_path = os.path.abspath(os.path.expanduser(traversal_path))
+    home_dir = os.path.expanduser("~")
+    current_dir = os.getcwd()
     
+    # This should be blocked
+    is_allowed = normalized_path.startswith(home_dir) or normalized_path.startswith(current_dir)
+    assert not is_allowed, "Path traversal should be blocked"
+```
+
+### 5. Insecure Temporary Directory Usage
+
+**Description of the Flaw:** The `migrate_repository()` function creates temporary directories using `tempfile.mkdtemp()` but doesn't properly validate the source URL before cloning, potentially allowing directory traversal or resource exhaustion.
+
+**Proof-of-Concept (PoC):**
+```python
+# Malicious source URL could contain:
+src_url = "file:///../../../etc/passwd"
+# Or specially crafted URLs that could affect the temporary directory
+```
+
+**Impact Demonstration:** Potential directory traversal, resource exhaustion, or unauthorized access to sensitive system files.
+
+**Surgical Patch:**
+```diff
+def migrate_repository(github_username, github_token, config, args=None):
+    """Mirror a repository from any source to GitHub with full history."""
+    print_header("The Great Migration Porter")
+
+    src_url = args.url if args and hasattr(args, 'url') and args.url else input("🔗 Enter Source Repository URL (GitLab/Bitbucket/etc): ")
+
+    # Security: Validate Source URL
     try:
-        # This should raise a ValueError
-        validate_config_path(temp_path)
-        assert False, "Config path validation should have prevented loading from arbitrary location"
-    except ValueError:
-        # Expected behavior
-        pass
+        validate_git_url(src_url)
+    except ValueError as e:
+        print_error(str(e))
+        return
+
+    dest_name = args.repo if args and hasattr(args, 'repo') and args.repo else input("📦 Enter Destination GitHub Repository Name: ")
+
+    is_private = args.private if args and hasattr(args, 'private') else input("🔒 Make destination private? (y/n) [y]: ").lower() != 'n'
+
+    print_info(f"Establishing destination on GitHub...")
+    # Ensure dest exists
+    create_or_get_github_repository(dest_name, f"Mirrored from {src_url}", is_private, github_username, github_token)
+
+    dest_url = f"https://{github_username}:{github_token}@github.com/{github_username}/{dest_name}.git"
+
+    # Use a temporary directory with secure prefix and validate it
+    temp_dir = tempfile.mkdtemp(prefix="pygitup_migration_")
+    try:
+        print_info("Performing mirror clone (this may take time for large repos)...")
+        # Additional validation: ensure the URL is a valid git URL before cloning
+        result = subprocess.run(["git", "clone", "--mirror", src_url, temp_dir], 
+                               check=True, capture_output=True, text=True)
+        
+        os.chdir(temp_dir)
+        print_info("Pushing mirror to GitHub (preserving all branches/tags)...")
+        result = subprocess.run(["git", "push", "--mirror", dest_url], 
+                               check=True, capture_output=True, text=True)
+
+        print_success(f"\nMigration Successful! 🚀")
+        print_info(f"View it at: https://github.com/{github_username}/{dest_name}")
+    except subprocess.CalledProcessError as e:
+        print_error(f"Migration failed during git operation: {e}")
+        print_error(f"Command output: {e.stderr}")
     finally:
-        os.unlink(temp_path)
-```
-
-### 4. Remote Code Execution via Subprocess
-
-**Description of the Flaw:**
-Multiple functions in the codebase use `subprocess.run()` with user-controlled input without proper sanitization, particularly in the git operations and migration functions.
-
-```python
-subprocess.run(["git", "clone", "--mirror", src_url, temp_dir], check=True)
-```
-
-**Proof-of-Concept (PoC) Payload:**
-```
-https://github.com/example/repo.git; rm -rf /tmp/target/
-```
-
-**Impact Demonstration:**
-An attacker could inject malicious commands through the source URL parameter in the migration function, leading to remote code execution on the system where PyGitUp is running.
-
-**Surgical Patch:**
-```diff
-+ import shlex
-+ 
-+ def validate_git_url(url):
-+     """Validate git URL to prevent command injection"""
-+     # Basic validation to ensure the URL looks like a proper git URL
-+     if not url.startswith(('http://', 'https://', 'git@', 'ssh://')):
-+         raise ValueError("Invalid git URL format")
-+     
-+     # Additional validation could include checking for shell metacharacters
-+     dangerous_chars = [';', '|', '&', '`', '$(', '${']
-+     for char in dangerous_chars:
-+         if char in url:
-+             raise ValueError(f"Dangerous character '{char}' detected in URL")
-+     
-+     return True
-+ 
-- subprocess.run(["git", "clone", "--mirror", src_url, temp_dir], check=True)
-+ try:
-+     validate_git_url(src_url)
-+     # Use shlex to properly handle special characters in the URL
-+     subprocess.run(["git", "clone", "--mirror", src_url, temp_dir], check=True)
-+ except ValueError as e:
-+     print_error(f"Invalid source URL: {e}")
-+     return
+        # Secure cleanup of temporary directory
+        try:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+        except Exception as e:
+            print_warning(f"Could not clean up temporary directory: {e}")
+        os.chdir(os.path.dirname(os.path.abspath(__file__))) # Back to relative safety
 ```
 
 **Security Regression Test:**
 ```python
-def test_git_url_validation():
-    """Test that git URL validation prevents command injection"""
-    from pygitup.project.project_ops import validate_git_url
+def test_secure_temp_directory():
+    """Test that temporary directories are created securely"""
+    import tempfile
+    import os
     
-    # Valid URLs should pass
-    valid_urls = [
-        "https://github.com/user/repo.git",
-        "git@github.com:user/repo.git",
-        "http://example.com/repo.git"
-    ]
-    
-    for url in valid_urls:
-        try:
-            validate_git_url(url)
-        except ValueError:
-            assert False, f"Valid URL was incorrectly rejected: {url}"
-    
-    # Invalid URLs with command injection should fail
-    invalid_urls = [
-        "https://github.com/user/repo.git; rm -rf /",
-        "http://example.com/repo.git && malicious_command",
-        "git@github.com:user/repo.git | cat /etc/passwd"
-    ]
-    
-    for url in invalid_urls:
-        try:
-            validate_git_url(url)
-            assert False, f"Malicious URL should have been rejected: {url}"
-        except ValueError:
-            # Expected behavior
-            pass
-```
-
-### 5. Insecure Credential Storage
-
-**Description of the Flaw:**
-GitHub tokens and API keys are stored in plain text in YAML configuration files with only basic file permission controls. The application also stores sensitive information in predictable file locations.
-
-```python
-with open(config_path, "w") as f:
-    yaml.dump(config, f, default_flow_style=False)
-
-if os.name != 'nt':
-    os.chmod(config_path, 0o600)
-```
-
-**Proof-of-Concept (PoC) Payload:**
-Any user with read access to the config directory can access stored credentials.
-
-**Impact Demonstration:**
-Stored GitHub tokens and API keys could be accessed by unauthorized users, leading to unauthorized access to GitHub repositories and third-party services.
-
-**Surgical Patch:**
-```diff
-+ from cryptography.fernet import Fernet
-+ import base64
-+ 
-+ def get_encryption_key():
-+     """Generate or retrieve encryption key for config file"""
-+     # In a real implementation, this would securely store/retrieve the key
-+     # For now, we'll derive it from a system-specific value
-+     import hashlib
-+     import getpass
-+     import os
-+     
-+     # Create a key based on system characteristics and user identity
-+     system_info = f"{os.uname() if hasattr(os, 'uname') else os.name}_{getpass.getuser()}_{os.path.expanduser('~')}"
-+     key = base64.urlsafe_b64encode(hashlib.sha256(system_info.encode()).digest()[:32])
-+     return key
-+ 
-+ def encrypt_config_data(data):
-+     """Encrypt sensitive configuration data"""
-+     f = Fernet(get_encryption_key())
-+     return f.encrypt(data.encode()).decode()
-+ 
-+ def decrypt_config_data(data):
-+     """Decrypt sensitive configuration data"""
-+     try:
-+         f = Fernet(get_encryption_key())
-+         return f.decrypt(data.encode()).decode()
-+     except:
-+         # If decryption fails, return original data for backward compatibility
-+         return data
-+ 
-- with open(config_path, "w") as f:
--     yaml.dump(config, f, default_flow_style=False)
-+ # Encrypt sensitive data before storing
-+ encrypted_config = config.copy()
-+ if "github" in encrypted_config and "token" in encrypted_config["github"]:
-+     encrypted_config["github"]["token"] = encrypt_config_data(encrypted_config["github"]["token"])
-+ if "github" in encrypted_config and "ai_api_key" in encrypted_config["github"]:
-+     encrypted_config["github"]["ai_api_key"] = encrypt_config_data(encrypted_config["github"]["ai_api_key"])
-+ 
-+ with open(config_path, "w") as f:
-+     yaml.dump(encrypted_config, f, default_flow_style=False)
-+ 
-+ # When loading config, decrypt sensitive data
-+ if "github" in loaded_config and "token" in loaded_config["github"]:
-+     loaded_config["github"]["token"] = decrypt_config_data(loaded_config["github"]["token"])
-+ if "github" in loaded_config and "ai_api_key" in loaded_config["github"]:
-+     loaded_config["github"]["ai_api_key"] = decrypt_config_data(loaded_config["github"]["ai_api_key"])
-```
-
-**Security Regression Test:**
-```python
-def test_config_encryption():
-    """Test that sensitive config data is properly encrypted"""
-    from pygitup.core.config import encrypt_config_data, decrypt_config_data
-    
-    original_token = "ghp_original_token_12345"
-    
-    # Encrypt the token
-    encrypted_token = encrypt_config_data(original_token)
-    
-    # Verify it's different from the original
-    assert encrypted_token != original_token, "Encrypted token should be different from original"
-    
-    # Decrypt and verify it matches the original
-    decrypted_token = decrypt_config_data(encrypted_token)
-    assert decrypted_token == original_token, "Decrypted token should match original"
+    # Test that temporary directory has secure prefix
+    temp_dir = tempfile.mkdtemp(prefix="pygitup_migration_")
+    try:
+        assert temp_dir.startswith(tempfile.gettempdir())
+        assert "pygitup_migration_" in os.path.basename(temp_dir)
+    finally:
+        os.rmdir(temp_dir)
 ```
 
 ## General Findings
 
 ### Hardcoded Secrets
-- The application does not appear to have hardcoded secrets in the source code itself, but it does reference several sensitive file patterns in the security module that should be monitored.
+- No hardcoded secrets were found in the codebase. Credentials are properly handled through configuration files with encryption.
 
 ### Vulnerable Function Usage
-- Multiple uses of `subprocess.run()` with user-controlled input
-- Direct use of `os.chdir()` with user input
-- YAML loading without proper input validation
-- Direct file operations without path validation
+- `subprocess.run()` is used safely with `shell=False` in most cases, but the remote URL construction in `push_to_github()` presents a risk.
+- `os.system()` is used in the main loop for clearing the screen, which is acceptable for this purpose.
+- `input()` is used extensively for user interaction, which is appropriate.
 
-### Additional Security Concerns
-- The application performs web scraping which could be vulnerable to server-side request forgery (SSRF) if the URL validation is bypassed
-- The offline queue functionality stores operations in JSON format which could be manipulated if the queue file is compromised
-- The application uses basic authentication with GitHub tokens which are stored locally
+### Additional Security Considerations
+1. The application stores GitHub tokens in encrypted configuration files, which is good practice.
+2. The AST-based SAST scanner provides good static analysis capabilities.
+3. Input validation exists for repository names and file paths, though it could be strengthened.
+4. The application has good error handling that prevents crashes but could leak information in some cases.
 
 ## Recommendations
 
-1. Implement comprehensive input validation for all user-provided data
-2. Use parameterized queries/subprocess calls where applicable
-3. Implement proper authentication and authorization checks
-4. Encrypt sensitive configuration data at rest
-5. Add comprehensive logging for security-relevant events
-6. Implement proper error handling to prevent information disclosure
-7. Regular security audits and penetration testing
-8. Consider using a secrets management solution instead of local storage
+1. **Remove automatic social engineering features** - The auto-starring and auto-following should be removed completely or made opt-in with explicit user consent.
+
+2. **Implement secure credential handling** - Use git's credential helper system instead of embedding tokens in URLs.
+
+3. **Strengthen input validation** - Enhance path validation to prevent traversal attacks in all user-input contexts.
+
+4. **Add security headers and rate limiting awareness** - The GitHub API wrapper should include better handling of security-relevant headers.
+
+5. **Improve error handling** - Ensure that error messages don't leak sensitive information to users.
+
+6. **Regular security audits** - Continue using the built-in security audit functionality and consider integrating with CI/CD pipelines.

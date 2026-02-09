@@ -111,18 +111,23 @@ def create_release_tag(github_username, github_token, config, args=None):
     
     print_info(f"Creating release {version} for {repo_name}...")
     
+    # Validation: Ensure standard version tag format
+    if not re.match(r'^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$', version):
+        print_error(f"Invalid version format: '{version}'. Use standard vX.Y.Z format.")
+        return
+
     # 1. Automated Local Tagging
     try:
         # Check if we are in the target repo
         if os.path.isdir(".git"):
             print_info("Local Git repository detected. Synchronizing tags...")
-            # Create tag
-            subprocess.run(["git", "tag", "-a", version, "-m", name], capture_output=True)
+            # Create tag (List-based args for safety)
+            subprocess.run(["git", "tag", "-a", version, "-m", name], check=True, capture_output=True)
             # Push tag
-            subprocess.run(["git", "push", "origin", version], capture_output=True)
+            subprocess.run(["git", "push", "origin", version], check=True, capture_output=True)
             print_success(f"Local tag '{version}' pushed to origin.")
     except Exception as e:
-        print_warning(f"Local tagging skipped/failed: {e}")
+        print_warning(f"Local tagging skipped/failed: {e.stderr if hasattr(e, 'stderr') else e}")
 
     # 2. GitHub API Release
     response = create_release(github_username, repo_name, github_token, version, name, changelog)
