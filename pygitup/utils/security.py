@@ -5,49 +5,45 @@ import subprocess
 from ..github.api import get_dependabot_alerts, get_secret_scanning_alerts
 from ..utils.ui import print_success, print_error, print_warning, print_info, print_header, Table, box, console
 
-# --- God Tier SSH Keygen ---
+# --- Secure SSH Keygen ---
 def generate_ssh_key(email):
     """
-    Generates a new SSH key if one doesn't exist, and returns the public key.
-    Avoids overwriting existing keys.
+    Generates a new SSH key (RSA 4096 or Ed25519) and returns the public key.
     """
     home_dir = os.path.expanduser("~")
     ssh_dir = os.path.join(home_dir, ".ssh")
-    key_path = os.path.join(ssh_dir, "pygitup_id_rsa")
-    pub_key_path = f"{key_path}.pub"
-
     os.makedirs(ssh_dir, exist_ok=True)
 
+    print("\n[bold]Select Key Algorithm:[/bold]")
+    print("1: [cyan]Ed25519[/cyan] (Modern, recommended)")
+    print("2: [green]RSA 4096[/green] (Maximum compatibility)")
+    choice = input("\n👉 Choice [1]: ") or "1"
+    
+    algo = "ed25519" if choice == "1" else "rsa"
+    key_name = f"pygitup_id_{algo}"
+    key_path = os.path.join(ssh_dir, key_name)
+    pub_key_path = f"{key_path}.pub"
+
     if not os.path.exists(key_path):
-        print_info("No existing 'pygitup_id_rsa' key found. Generating a new one...")
+        print_info(f"Generating new {algo.upper()} key...")
         try:
-            # Generate the key using ssh-keygen, non-interactively
-            command = [
-                "ssh-keygen",
-                "-t", "rsa",
-                "-b", "4096",
-                "-C", email,
-                "-f", key_path,
-                "-N", ""  # No passphrase
-            ]
-            result = subprocess.run(command, check=True, capture_output=True, text=True)
-            print_success(f"New SSH key generated at {key_path}")
-        except subprocess.CalledProcessError as e:
-            print_error(f"Failed to generate SSH key: {e.stderr}")
-            return None, None
-        except FileNotFoundError:
-            print_error("`ssh-keygen` command not found. Please install an SSH client (like OpenSSH).")
+            command = ["ssh-keygen", "-t", algo]
+            if algo == "rsa":
+                command += ["-b", "4096"]
+            command += ["-C", email, "-f", key_path, "-N", ""]
+            
+            subprocess.run(command, check=True, capture_output=True, text=True)
+            print_success(f"Key generated at {key_path}")
+        except Exception as e:
+            print_error(f"Failed to generate key: {e}")
             return None, None
     else:
-        print_info(f"Using existing SSH key at {key_path}")
+        print_info(f"Using existing key at {key_path}")
 
-    # Read the public key
     try:
         with open(pub_key_path, "r") as f:
-            public_key = f.read().strip()
-        return public_key, key_path
-    except FileNotFoundError:
-        print_error(f"Could not read public key at {pub_key_path}")
+            return f.read().strip(), key_path
+    except Exception:
         return None, None
 
 # List of patterns that are usually sensitive or too heavy to upload

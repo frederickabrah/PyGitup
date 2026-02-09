@@ -52,15 +52,18 @@ def initialize_git_repository(project_path):
         os.chdir(project_path)
         print_info(f"Changed directory to {project_path}")
         if not os.path.isdir(".git"):
-            subprocess.run(["git", "init"], check=True)
+            # Use list-based args for safety
+            subprocess.run(["git", "init"], check=True, capture_output=True)
             print_success("Initialized empty Git repository.")
         else:
             print_info("This is already a git repository.")
-        subprocess.run(["git", "add", "."], check=True)
+        
+        subprocess.run(["git", "add", "."], check=True, capture_output=True)
         print_info("Staged all files.")
+        
         status_result = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
         if status_result.stdout:
-             subprocess.run(["git", "commit", "-m", "Initial commit"], check=True)
+             subprocess.run(["git", "commit", "-m", "Initial commit via PyGitUp"], check=True, capture_output=True)
              print_success("Committed files.")
         else:
             print_info("No changes to commit. Working tree clean.")
@@ -68,7 +71,7 @@ def initialize_git_repository(project_path):
         print_error(f"Error: The directory '{project_path}' does not exist.")
         sys.exit(1)
     except subprocess.CalledProcessError as e:
-        print_error(f"An error occurred while running a git command: {e}")
+        print_error(f"Git operation failed: {e.stderr if e.stderr else e}")
         sys.exit(1)
 
 def create_or_get_github_repository(repo_name, repo_description, is_private, github_username, github_token):
@@ -87,27 +90,34 @@ def create_or_get_github_repository(repo_name, repo_description, is_private, git
         sys.exit(1)
 
 def push_to_github(repo_name, github_username, github_token):
-    """Adds the remote and force pushes to the new repository."""
-    remote_url = f"https://{github_username}:{github_token}@github.com/{github_username}/{repo_name}.git"
+    """
+    Force pushes to GitHub using a temporary authenticated session.
+    Keeps tokens out of .git/config to prevent credential exposure.
+    """
+    # Clean URLs for permanent storage
     safe_remote_url = f"https://github.com/{github_username}/{repo_name}.git"
+    # Authenticated URL for the single push operation
+    auth_remote_url = f"https://{github_token}@github.com/{github_username}/{repo_name}.git"
+    
     try:
+        # 1. Setup / Update clean remote
         result = subprocess.run(["git", "remote"], capture_output=True, text=True)
         if "origin" in result.stdout.splitlines():
-            existing_url_result = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True, text=True, check=True)
-            if existing_url_result.stdout.strip() != remote_url and existing_url_result.stdout.strip() != safe_remote_url:
-                subprocess.run(["git", "remote", "set-url", "origin", remote_url], check=True)
-            else:
-                subprocess.run(["git", "remote", "set-url", "origin", remote_url], check=True)
+            subprocess.run(["git", "remote", "set-url", "origin", safe_remote_url], check=True)
         else:
-            subprocess.run(["git", "remote", "add", "origin", remote_url], check=True)
-        branch_result = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True, check=True)
-        if branch_result.stdout.strip() != "main":
-            subprocess.run(["git", "branch", "-M", "main"], check=True)
-        print_info("Pushing to GitHub with force...")
-        subprocess.run(["git", "push", "-u", "--force", "origin", "main"], check=True)
-        print_success("Pushed to GitHub.")
+            subprocess.run(["git", "remote", "add", "origin", safe_remote_url], check=True)
+            
+        # 2. Ensure we are on 'main'
+        subprocess.run(["git", "branch", "-M", "main"], check=True)
+        
+        # 3. Perform push using the authenticated URL (not saved to config)
+        print_info("Pushing to GitHub (Authenticated Session)...")
+        # We use the auth_remote_url directly in the push command
+        subprocess.run(["git", "push", "-u", "--force", auth_remote_url, "main"], check=True, capture_output=True)
+        
+        print_success("Pushed to GitHub successfully.")
     except subprocess.CalledProcessError as e:
-        print_error(f"An error occurred while pushing to GitHub: {e}")
+        print_error(f"Push failed: {e.stderr if e.stderr else e}")
         sys.exit(1)
 
 def upload_project_directory(github_username, github_token, config, args=None):
@@ -498,26 +508,32 @@ def migrate_repository(github_username, github_token, config, args=None):
     # Ensure dest exists
     create_or_get_github_repository(dest_name, f"Mirrored from {src_url}", is_private, github_username, github_token)
     
-    dest_url = f"https://{github_username}:{github_token}@github.com/{github_username}/{dest_name}.git"
+    # Authenticated URL for the single push operation
+    auth_dest_url = f"https://{github_token}@github.com/{github_username}/{dest_name}.git"
     
     # Use a temporary directory for the mirror operation
     temp_dir = tempfile.mkdtemp()
     try:
         print_info("Performing mirror clone (this may take time for large repos)...")
-        subprocess.run(["git", "clone", "--mirror", src_url, temp_dir], check=True)
+        # Direct arguments to avoid shell=True risk
+        subprocess.run(["git", "clone", "--mirror", src_url, temp_dir], check=True, capture_output=True)
         
+        # Change to the temporary directory
+        current_dir = os.getcwd()
         os.chdir(temp_dir)
-        print_info("Pushing mirror to GitHub (preserving all branches/tags)...")
-        subprocess.run(["git", "push", "--mirror", dest_url], check=True)
         
+        print_info("Pushing mirror to GitHub (Authenticated Session)...")
+        # We push to the auth_dest_url but the origin URL in the clone remains clean
+        subprocess.run(["git", "push", "--mirror", auth_dest_url], check=True, capture_output=True)
+        
+        os.chdir(current_dir)
         print_success(f"\nMigration Successful! 🚀")
         print_info(f"View it at: https://github.com/{github_username}/{dest_name}")
     except subprocess.CalledProcessError as e:
-        print_error(f"Migration failed during git operation: {e}")
+        print_error(f"Migration failed during git operation: {e.stderr if e.stderr else e}")
     finally:
         # Cleanup
         shutil.rmtree(temp_dir, ignore_errors=True)
-        os.chdir(os.path.dirname(os.path.abspath(__file__))) # Back to relative safety
 
 def manage_bulk_repositories(github_token):
     """List all repositories and show aggregated health scores."""

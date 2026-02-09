@@ -71,94 +71,48 @@ def scrape_repo_info(url):
 
         # --- Statistics (Stars, Forks, Watchers, Issues) ---
         def get_count(href_suffix, id_fallback=None):
+            val = "0"
             # Try by ID first
             if id_fallback:
                 tag = soup.find(id=id_fallback)
-                if tag: return tag.get('title') or tag.get_text(strip=True)
+                if tag: val = tag.get('title') or tag.get_text(strip=True)
             
-            # Try by href
-            link = soup.find('a', href=lambda x: x and x.endswith(href_suffix))
-            if link:
-                count_span = link.find('span', class_='Counter')
-                return count_span.get('title') if count_span else link.get_text(strip=True)
-            return "N/A"
+            # Try by href if ID failed or returned label
+            if val == "0" or not any(char.isdigit() for char in val):
+                link = soup.find('a', href=lambda x: x and x.endswith(href_suffix))
+                if link:
+                    count_span = link.find('span', class_='Counter')
+                    val = count_span.get('title') if count_span else link.get_text(strip=True)
+            
+            # Clean: Extract only digits/commas
+            digits = re.sub(r'[^0-9,.]', '', val)
+            return digits if digits else "0"
 
         data['stargazers_count'] = get_count('/stargazers', 'repo-stars-counter-star')
         data['forks_count'] = get_count('/forks', 'repo-network-counter')
-        data['open_issues_count'] = get_count('/issues') # ID issues-tab usually works but let's be safe
-        
-        # Watchers (Often hidden in the 'Watch' dropdown, hard to scrape directly from main page sometimes, 
-        # but usually /watchers page link exists in sidebar or header)
+        data['open_issues_count'] = get_count('/issues')
         data['watchers_count'] = get_count('/watchers')
 
-        # --- Contributors ---
-        # Sidebar link to /contributors
-        contrib_link = soup.find('a', href=lambda x: x and x.endswith('/contributors'))
-        if contrib_link:
-            count_span = contrib_link.find('span', class_='Counter')
-            data['contributors_count'] = count_span.get('title') if count_span else None
-        else:
-            data['contributors_count'] = None
+        # --- Deep Footprint Scan (Description + README) ---
+        all_text = data['description']
+        
+        # Try to find README link to scrape more text
+        readme_link = soup.find('div', id='readme')
+        if readme_link:
+            all_text += "\n" + readme_link.get_text(strip=True)
+            
+        data['social_links'] = extract_social_links(all_text)
 
-        # --- License ---
-        # Look for "License" header in sidebar or file
-        license_header = soup.find('h3', string='License')
-        if license_header:
-            # The next sibling or link usually contains the license name
-            # This is tricky with BS4 structure variations.
-            # Alternative: Search for the LICENSE file link in the file list or sidebar
-            license_link = soup.find('a', href=lambda x: x and 'LICENSE' in x and 'blob' in x) # File list
-            # Or sidebar link
-            sidebar_license = soup.find('a', href=lambda x: x and '/blob/' in x and 'LICENSE' in x)
-            if sidebar_license:
-                 # Often the text is "MIT License" or similar
-                 data['license'] = {'name': sidebar_license.get_text(strip=True)}
+        # --- OSINT: Community & Sustainability ---
+        # 1. Used By (Dependents)
+        used_by_link = soup.find('a', href=lambda x: x and '/network/dependents' in x)
+        if used_by_link:
+            count_span = used_by_link.find('span', class_='Counter')
+            data['used_by'] = count_span.get('title') if count_span else used_by_link.get_text(strip=True)
         
-        # If not found, try finding a simplified "License" link in the About section
-        if 'license' not in data:
-            about_license = soup.find('a', href=lambda x: x and 'LICENSE' in x)
-            if about_license:
-                 data['license'] = {'name': about_license.get_text(strip=True)}
-
-        # --- Language ---
-        lang_item = soup.find('span', class_='color-fg-default text-bold mr-1')
-        data['language'] = lang_item.get_text(strip=True) if lang_item else "Unknown"
-             
-        # --- Metadata ---
-        data['private'] = False
-        data['clone_url'] = f"{url}.git"
-        
-        # --- Latest Release ---
-        release_header = soup.find('a', href=lambda x: x and '/releases/tag/' in x)
-        if release_header:
-            data['latest_release'] = release_header.get_text(strip=True)
-            # Try to get date
-            # relative-time datetime="..."
-            time_tag = release_header.find_next('relative-time')
-            if time_tag:
-                data['latest_release_date'] = time_tag.get('datetime')
-        
-        # --- OSINT: Dependencies ---
-        used_by_tag = soup.find('a', href=lambda x: x and '/network/dependents' in x)
-        if used_by_tag:
-            count_span = used_by_tag.find('span', class_='Counter')
-            data['used_by'] = count_span.get('title') if count_span else used_by_tag.get_text(strip=True)
-        
-        # --- OSINT: Sponsorship ---
+        # 2. Sponsorship Status
         sponsor_btn = soup.find('a', href=lambda x: x and '/sponsors/' in x)
         data['is_sponsored'] = True if sponsor_btn else False
-
-        # --- OSINT: Topics ---
-        topics = []
-        topic_tags = soup.find_all('a', class_='topic-tag')
-        for t in topic_tags:
-            topics.append(t.get_text(strip=True))
-        data['topics'] = topics
-
-        # --- OSINT: Social Links ---
-        # Scan description and sidebar
-        socials = extract_social_links(data['description'])
-        data['social_links'] = socials
 
         # --- OSINT: Preview Image ---
         og_image = soup.find('meta', property='og:image')
