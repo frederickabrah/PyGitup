@@ -462,12 +462,12 @@ class PyGitUpTUI(App):
                     self.query_one("#chat-loader").remove_class("-loading")
                     return
                 result = execute_agent_tool(tc['name'], tc['args'])
-                self.chat_history.append({"role": "user", "text": "", "tool_results": [{"name": tc['name'], "content": result}]}
+                self.chat_history.append({"role": "user", "text": "", "tool_results": [{"name": tc['name'], "content": result}]})
                 query = "Proceed with tool results."
         self.query_one("#chat-loader").remove_class("-loading")
 
     async def resume_agent_task(self, tool_call, result, denied=False):
-        self.chat_history.append({"role": "user", "text": "", "tool_results": [{"name": tool_call['name'], "content": result}]}
+        self.chat_history.append({"role": "user", "text": "", "tool_results": [{"name": tool_call['name'], "content": result}]})
         await self.mentor_task("Proceed based on tool results.")
 
     # --- VIEW NAVIGATION ---
