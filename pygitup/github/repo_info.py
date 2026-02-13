@@ -84,39 +84,39 @@ def get_repo_health_metrics(username, repo_name, token):
             commits = commits_response.json()
             metrics['recent_commits'] = len(commits)
             if commits:
-                # Calculate median time between commits (Sophisticated Velocity Math)
                 from datetime import datetime
                 dates = [datetime.fromisoformat(c['commit']['author']['date'].replace('Z', '+00:00')) 
-                         for c in commits[:20]] # Last 20 commits
+                         for c in commits[:20]]
                 if len(dates) > 1:
                     time_diffs = sorted([(dates[i] - dates[i+1]).total_seconds() / 86400 for i in range(len(dates)-1)])
-                    # Use median to avoid outlier skew
                     median_days = time_diffs[len(time_diffs)//2]
                     metrics['development_velocity_days'] = round(median_days, 2)
-                    
-                    # Burst detection: comparing last 3 to last 20
                     recent_burst = sum(time_diffs[:3]) / 3
                     metrics['activity_status'] = "Active/Bursting" if recent_burst < median_days else "Stable"
-    except Exception:
-        pass
+        else:
+            metrics['recent_commits'] = "N/A (Access Denied)"
+    except Exception as e:
+        metrics['recent_commits'] = f"Error: {str(e)[:20]}"
 
     # Get closed issues
     try:
         issues_response = get_issues(username, repo_name, token, state='closed')
         if issues_response.status_code == 200:
-            closed_issues = issues_response.json()
-            metrics['closed_issues'] = len(closed_issues)
+            metrics['closed_issues'] = len(issues_response.json())
+        else:
+            metrics['closed_issues'] = "N/A"
     except Exception:
-        pass
+        metrics['closed_issues'] = "Error"
 
     # Get contributors
     try:
         contrib_response = get_contributors(username, repo_name, token)
         if contrib_response.status_code == 200:
-            contributors = contrib_response.json()
-            metrics['contributors_count'] = len(contributors)
+            metrics['contributors_count'] = len(contrib_response.json())
+        else:
+            metrics['contributors_count'] = "N/A"
     except Exception:
-        pass
+        metrics['contributors_count'] = "Error"
 
     return metrics
 
