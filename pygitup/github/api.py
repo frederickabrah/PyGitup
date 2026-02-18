@@ -9,36 +9,79 @@ def get_github_headers(token):
         "Accept": "application/vnd.github.v3+json"
     }
 
-def github_request(method, url, token, **kwargs):
-    """Centralized GitHub API request handler with rate-limiting support."""
+def github_request(method, url, token, paginate=False, **kwargs):
+    """Centralized GitHub API request handler with pagination and rate-limiting."""
     headers = get_github_headers(token)
     if 'headers' in kwargs:
         headers.update(kwargs.pop('headers'))
     
-    while True:
-        try:
-            response = requests.request(method, url, headers=headers, **kwargs)
+    results = []
+    current_url = url
+    max_retries = 3
+    
+    try:
+        while current_url:
+            retry_count = 0
+            response = None
             
-            # Handle rate limiting
-            if response.status_code == 403 and 'X-RateLimit-Remaining' in response.headers:
-                remaining = int(response.headers.get('X-RateLimit-Remaining', 1))
-                if remaining == 0:
-                    reset_time = int(response.headers.get('X-RateLimit-Reset', time.time() + 60))
-                    sleep_duration = max(reset_time - time.time() + 1, 1)
-                    print(f"\n[!] Rate limit reached. Sleeping for {sleep_duration:.0f}s until reset...")
-                    time.sleep(sleep_duration)
-                    continue
+            while retry_count < max_retries:
+                try:
+                    response = requests.request(method, current_url, headers=headers, timeout=15, **kwargs)
+                    
+                    # Handle rate limiting
+                    if response.status_code == 403 and 'X-RateLimit-Remaining' in response.headers:
+                        remaining = int(response.headers.get('X-RateLimit-Remaining', 1))
+                        if remaining == 0:
+                            reset_time = int(response.headers.get('X-RateLimit-Reset', time.time() + 60))
+                            sleep_duration = max(reset_time - time.time() + 1, 1)
+                            time.sleep(sleep_duration)
+                            continue # Retry the same URL after reset
+                    
+                    break # Success or non-retryable error
+                    
+                except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+                    retry_count += 1
+                    if retry_count == max_retries: raise
+                    time.sleep(retry_count * 2)
             
-            return response
-        except requests.exceptions.RequestException as e:
-            print(f"Request failed: {e}")
-            raise
+            if not paginate:
+                return response
+                
+            # Pagination logic
+            data = response.json()
+            if isinstance(data, list):
+                results.extend(data)
+            else:
+                return response # Can't paginate non-list data
+                
+            # Check for next page
+            current_url = None
+            if 'Link' in response.headers:
+                links = response.headers['Link'].split(',')
+                for link in links:
+                    if 'rel="next"' in link:
+                        current_url = link.split(';')[0].strip('< >')
+                        break
+        
+        # Return accumulated results as a MockResponse object
+        if paginate:
+            class MockResponse:
+                def __init__(self, data, status, headers):
+                    self.data = data
+                    self.status_code = status
+                    self.headers = headers
+                def json(self): return self.data
+            return MockResponse(results, 200, response.headers)
+            
+    except requests.exceptions.RequestException as e:
+        # We need a dummy response for failures if caught at this level
+        # For CLI consistency, we just raise or return None
+        raise e
 
 def graphql_request(query, variables, token):
     """Execute a GitHub GraphQL (v4) API request with rate-limiting support."""
     url = "https://api.github.com/graphql"
     payload = {"query": query, "variables": variables}
-    # GraphQL always uses POST
     return github_request("POST", url, token, json=payload)
 
 def get_repo_info(username, repo_name, token):
@@ -65,43 +108,28 @@ def update_file(username, repo_name, file_path, content, token, message, sha=Non
     """Update or create a file in a repository."""
     url = f"https://api.github.com/repos/{username}/{repo_name}/contents/{file_path}"
     encoded_content = base64.b64encode(content).decode('utf-8')
-    data = {
-        "message": message,
-        "content": encoded_content
-    }
-    if sha:
-        data["sha"] = sha
+    data = {"message": message, "content": encoded_content}
+    if sha: data["sha"] = sha
     return github_request("PUT", url, token, json=data)
 
 def get_commit_history(username, repo_name, token, path=None):
     """Get commit history for a repository or specific file."""
     url = f"https://api.github.com/repos/{username}/{repo_name}/commits"
     params = {}
-    if path:
-        params["path"] = path
+    if path: params["path"] = path
     return github_request("GET", url, token, params=params)
 
 def create_release(username, repo_name, token, tag_name, name, body=""):
     """Create a new GitHub release."""
     url = f"https://api.github.com/repos/{username}/{repo_name}/releases"
-    data = {
-        "tag_name": tag_name,
-        "name": name,
-        "body": body,
-        "draft": False,
-        "prerelease": False
-    }
+    data = {"tag_name": tag_name, "name": name, "body": body, "draft": False, "prerelease": False}
     return github_request("POST", url, token, json=data)
 
 def create_issue(username, repo_name, token, title, body="", assignees=None):
     """Create a new GitHub issue."""
     url = f"https://api.github.com/repos/{username}/{repo_name}/issues"
-    data = {
-        "title": title,
-        "body": body
-    }
-    if assignees:
-        data["assignees"] = assignees
+    data = {"title": title, "body": body}
+    if assignees: data["assignees"] = assignees
     return github_request("POST", url, token, json=data)
 
 def get_pull_requests(username, repo_name, token, state="open"):
@@ -113,12 +141,7 @@ def get_pull_requests(username, repo_name, token, state="open"):
 def create_pull_request(username, repo_name, token, title, head, base, body=""):
     """Create a new pull request."""
     url = f"https://api.github.com/repos/{username}/{repo_name}/pulls"
-    data = {
-        "title": title,
-        "head": head,
-        "base": base,
-        "body": body
-    }
+    data = {"title": title, "head": head, "base": base, "body": body}
     return github_request("POST", url, token, json=data)
 
 def get_contributors(username, repo_name, token):
@@ -150,7 +173,6 @@ def get_repo_languages(username, repo_name, token):
 def get_community_profile(username, repo_name, token):
     """Get community health metrics (presence of README, LICENSE, etc)."""
     url = f"https://api.github.com/repos/{username}/{repo_name}/community/profile"
-    # This endpoint uses a different preview header for some data
     return github_request("GET", url, token)
 
 def get_latest_release(username, repo_name, token):
@@ -159,9 +181,18 @@ def get_latest_release(username, repo_name, token):
     return github_request("GET", url, token)
 
 def get_repo_contents(username, repo_name, token, path=""):
-    """Get repository contents recursively."""
+    """Get repository contents (shallow)."""
     url = f"https://api.github.com/repos/{username}/{repo_name}/contents/{path}"
     return github_request("GET", url, token)
+
+def get_repo_tree_recursive(username, repo_name, token, branch="main"):
+    """Fetch the entire repository tree recursively using the Git Trees API."""
+    ref_url = f"https://api.github.com/repos/{username}/{repo_name}/git/ref/heads/{branch}"
+    ref_resp = github_request("GET", ref_url, token)
+    if ref_resp.status_code != 200: return ref_resp
+    sha = ref_resp.json()['object']['sha']
+    tree_url = f"https://api.github.com/repos/{username}/{repo_name}/git/trees/{sha}?recursive=1"
+    return github_request("GET", tree_url, token)
 
 def search_user_by_email(email, token):
     """Find a GitHub user by their email address."""
@@ -182,10 +213,7 @@ def update_repo_visibility(username, repo_name, token, private):
 def upload_ssh_key(token, title, key):
     """Upload a new SSH public key to the user's GitHub account."""
     url = "https://api.github.com/user/keys"
-    data = {
-        "title": title,
-        "key": key
-    }
+    data = {"title": title, "key": key}
     return github_request("POST", url, token, json=data)
 
 def delete_repo_api(username, repo_name, token):
