@@ -181,7 +181,8 @@ def persistence_tool(action, key, value=None):
     if os.path.exists(state_file):
         try:
             with open(state_file, 'r') as f: state = json.load(f)
-        except: pass
+        except Exception as e:
+            print_error(f"Failed to load mission state: {e}")
     
     if action == "set":
         state[key] = value

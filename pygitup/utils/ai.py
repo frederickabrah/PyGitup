@@ -44,12 +44,10 @@ def call_gemini_api(api_key, prompt, timeout=30):
         print_error("Gemini API Key missing. Run Option 14.")
         return None
 
-    # Optimized 'Flash-First' fallback chain based on diagnostic results
+    # Optimized 'Flash-First' fallback chain based on actual model availability
     models = [
-        "gemini-2.5-flash",
         "gemini-2.0-flash", 
         "gemini-1.5-flash",
-        "gemini-2.5-pro",
         "gemini-1.5-pro"
     ]
     # v1beta is prioritized due to high availability in diagnostics
@@ -160,8 +158,8 @@ def analyze_failed_log(api_key, log_text):
     prompt = f"Analyze this execution log and identify the bug. Provide a concise explanation and a code fix:\n\n{log_text[:8000]}"
     return call_gemini_api(api_key, prompt)
 
-def ai_diagnostics_workflow(config, command):
-    """Executes a command and uses AI to heal failures."""
+def ai_diagnostics_workflow(config, command, tui_app=None):
+    """Executes a command and uses the Agent to autonomously heal failures."""
     print_info(f"🚀 Running diagnostic command: {command}")
     
     from .agent_tools import run_shell_tool
@@ -171,18 +169,47 @@ def ai_diagnostics_workflow(config, command):
         print_success("Command passed successfully. No healing required.")
         return True
         
-    print_warning("⚠️ Command failed. Initiating AI Diagnosis...")
+    print_warning("⚠️ Command failed. Initiating Autonomous Healing...")
     api_key = config["github"].get("ai_api_key")
-    analysis = analyze_failed_log(api_key, result)
     
-    if analysis:
-        console.print(Panel(analysis, title="AI Root Cause Analysis", border_style="red"))
-        confirm = input("\nWould you like the Agent to attempt a fix? (y/n): ").lower()
-        if confirm == 'y':
-            # In a full implementation, we'd feed this back into the Sentinel Agent loop
-            print_info("🤖 Sentinel Agent is analyzing the codebase to apply the fix...")
-            # For now, we use the existing Agent chat to handle the fix
-            return analysis
+    # 1. Root Cause Analysis
+    analysis = analyze_failed_log(api_key, result)
+    if not analysis: return False
+    
+    console.print(Panel(analysis, title="AI Root Cause Analysis", border_style="red"))
+    
+    confirm = input("\n🤖 Sentinel Agent is ready to heal this bug. Proceed? (y/n): ").lower()
+    if confirm != 'y': return False
+
+    # 2. Autonomous Fix Application
+    # We feed the analysis and the failure context back into the Agent's brain
+    # and instruct it to fix the code and verify.
+    healing_query = f"The command '{command}' failed with this log:\n{result}\n\nAnalysis: {analysis}\n\nTASK: Fix the code so this command passes. Then run the command again to verify."
+    
+    print_info("🛠️ Agent is applying repairs...")
+    # In TUI mode, we'd trigger the mentor_task. In CLI, we call the agent directly.
+    if tui_app:
+        # TUI integration handled via task return
+        return analysis 
+    
+    # CLI direct execution
+    resp = code_mentor_chat(api_key, healing_query, result) # Simple context for now
+    if resp['tool_calls']:
+        from .agent_tools import execute_agent_tool
+        for tc in resp['tool_calls']:
+            print_info(f"⚙️ Executing Agent repair: {tc['name']}...")
+            execute_agent_tool(tc['name'], tc['args'])
+            
+        # 3. Final Verification
+        print_info("📡 Verifying repair...")
+        verify_result = run_shell_tool(command)
+        if "EXIT CODE: 0" in verify_result:
+            print_success("✅ CODE HEALED! Verification passed.")
+            return True
+        else:
+            print_error("❌ Healing attempt failed to pass verification.")
+            return False
+            
     return False
 
 from .agent_tools import AGENT_TOOLS_SPEC, execute_agent_tool

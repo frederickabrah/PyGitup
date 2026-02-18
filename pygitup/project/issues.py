@@ -21,7 +21,6 @@ def get_git_author(file_path, line_num):
     return None
 
 def get_code_context(file_path, line_num, window=3):
-    """Grabs a few lines of code around the TODO for better issue context."""
     try:
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
             lines = f.readlines()
@@ -33,7 +32,6 @@ def get_code_context(file_path, line_num, window=3):
         return "Context unavailable."
 
 def scan_todos(github_username, github_token, config, args=None):
-    """Advanced TODO scanner with Git Blame and Context support."""
     if args and args.dry_run:
         print_info("*** Dry Run Mode: Scanning but not creating issues. ***")
 
@@ -45,7 +43,6 @@ def scan_todos(github_username, github_token, config, args=None):
     pattern_input = args.pattern if args and args.pattern else input("Enter file patterns (e.g., *.py,*.js) [*.py]: ")
     file_patterns = pattern_input.split(",") if pattern_input else ["*.py"]
     
-    print_info(f"Scanning for TODOs in {repo_name} using patterns {file_patterns}...")
 
     # Fetch existing issues to avoid duplicates
     print_info("Checking existing issues to prevent duplicates...")
@@ -66,8 +63,6 @@ def scan_todos(github_username, github_token, config, args=None):
                 try:
                     with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                         for line_num, line in enumerate(f, 1):
-                            if "TODO" in line:
-                                match = re.search(r'TODO:(.*)', line, re.IGNORECASE)
                                 if match:
                                     comment = match.group(1).strip()
                                     author = get_git_author(file_path, line_num)
@@ -83,14 +78,11 @@ def scan_todos(github_username, github_token, config, args=None):
                     print_warning(f"Skipping {file_path}: {e}")
 
     if not found_todos:
-        print_success("Clean sweep! No TODOs found.")
         return
 
-    print_info(f"Found {len(found_todos)} TODOs. Processing...")
     
     created_count = 0
     for todo in found_todos:
-        title = f"TODO: {todo['comment'][:50]}" # Cap title length
         if title in existing_titles:
             print_warning(f"Skipping duplicate issue: {title}")
             continue

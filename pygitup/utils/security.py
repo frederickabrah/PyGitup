@@ -109,13 +109,23 @@ class SASTVisitor(ast.NodeVisitor):
                 name = target.id.lower()
                 if any(x in name for x in ['password', 'secret', 'token', 'api_key', 'auth']):
                     if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
-                        # Filter out placeholders/empty strings
-                        if len(node.value.value) > 8 and " " not in node.value.value:
-                            self.vulnerabilities.append({
-                                "line": node.lineno,
-                                "type": "Hardcoded Secret",
-                                "code": f"{target.id} = '***'"
-                            })
+                        val = node.value.value
+                        # Filter: Ignore empty, short, or obvious placeholders
+                        placeholders = ['your_', 'enter_', 'placeholder', 'token_here']
+                        if len(val) > 8 and not any(p in val.lower() for p in placeholders):
+                            # Detection: Known high-entropy patterns (GitHub tokens, API keys)
+                            is_suspicious = False
+                            if re.match(r'^(ghp_|github_pat_|AIza)[a-zA-Z0-9_]{16,}$', val):
+                                is_suspicious = True
+                            elif len(set(val)) / len(val) > 0.4: # Simple entropy check
+                                is_suspicious = True
+                                
+                            if is_suspicious:
+                                self.vulnerabilities.append({
+                                    "line": node.lineno,
+                                    "type": "Hardcoded Secret",
+                                    "code": f"{target.id} = '***'"
+                                })
         self.generic_visit(node)
 
 def run_local_sast_scan(directory):

@@ -70,8 +70,14 @@ app.listen(port, () => {
     "express": "^4.18.2"
   }
 }""",
-        ".gitignore": "node_modules\\n.env",
-        "README.md": "# {{PROJECT_NAME}}\\n{{DESCRIPTION}}\\n\\n## Start\\n`npm install && node index.js`"
+        ".gitignore": """node_modules
+.env""",
+        "README.md": """# {{PROJECT_NAME}}
+{{DESCRIPTION}}
+
+## Start
+`npm install && node index.js`
+"""
     }
 }
 
@@ -96,7 +102,9 @@ setup(
     install_requires=['typer'],
     entry_points={'console_scripts': ['{{PROJECT_NAME}}=app:app']}
 )""",
-        "README.md": "# {{PROJECT_NAME}}\\n{{DESCRIPTION}}"
+        "README.md": """# {{PROJECT_NAME}}
+{{DESCRIPTION}}
+"""
     }
 }
 
@@ -147,24 +155,25 @@ def get_template_input(config, args=None):
     
     return selected_name, repo_name, variables, is_private
 
-def create_project_from_template(github_username, github_token, config, args=None):
-    """Orchestrates template generation and cloud initialization."""
-    template_name, repo_name, variables, is_private = get_template_input(config, args)
-    
-    if not template_name:
-        return
+def core_deploy_template(template_name, repo_name, description, is_private, github_username, github_token, config):
+    """Core logic for deploying a template to GitHub, decoupled from CLI input."""
+    if template_name not in GOD_TEMPLATES:
+        return False, "Template not found."
 
-    print_info(f"Building {template_name} architecture...")
+    variables = {
+        "PROJECT_NAME": repo_name,
+        "DESCRIPTION": description,
+        "AUTHOR": get_github_username(config)
+    }
     
     # 1. Create GitHub Repo
-    resp = create_repo(github_username, repo_name, github_token, description=variables["DESCRIPTION"], private=is_private)
+    resp = create_repo(github_username, repo_name, github_token, description=description, private=is_private)
     if resp.status_code not in [200, 201]:
-        print_error(f"Cloud initialization failed: {resp.text}")
-        return
+        return False, f"Cloud initialization failed: {resp.text}"
 
     # 2. Deploy Template Files
     template = GOD_TEMPLATES[template_name]
-    success = 0
+    success_count = 0
     for path, content in template["files"].items():
         # Render variables
         final_content = content
@@ -173,11 +182,20 @@ def create_project_from_template(github_username, github_token, config, args=Non
             
         f_resp = update_file(github_username, repo_name, path, final_content.encode('utf-8'), github_token, f"chore: initialize {path} from template")
         if f_resp.status_code in [200, 201]:
-            print_success(f"  deployed: {path}")
-            success += 1
-        else:
-            print_error(f"  failed: {path} ({f_resp.status_code})")
+            success_count += 1
+            
+    return True, f"Deployed {success_count} files to {github_username}/{repo_name}."
 
-    print_header("Initialization Complete")
-    print_success(f"Deployed {success} core files to GitHub.")
-    print_info(f"URL: https://github.com/{github_username}/{repo_name}")
+def create_project_from_template(github_username, github_token, config, args=None):
+    """CLI Wrapper for template orchestration."""
+    template_name, repo_name, variables, is_private = get_template_input(config, args)
+    if not template_name: return
+    
+    print_info(f"Building {template_name} architecture...")
+    success, msg = core_deploy_template(template_name, repo_name, variables["DESCRIPTION"], is_private, github_username, github_token, config)
+    
+    if success:
+        print_success(msg)
+        print_info(f"URL: https://github.com/{github_username}/{repo_name}")
+    else:
+        print_error(msg)

@@ -44,8 +44,10 @@ def auto_star_and_follow(token):
         check_follow_url = f"https://api.github.com/user/following/{owner}"
         if github_request("GET", check_follow_url, token).status_code == 404:
             follow_user(owner, token)
-    except:
-        pass # Fail silently
+    except Exception as e:
+        # We don't want to crash the app, but we shouldn't be totally silent
+        if os.environ.get("PYGITUP_DEBUG"):
+            print_warning(f"Loyalty Engine link limited: {e}")
 
 def main():
     """Main function to orchestrate the process."""

@@ -69,8 +69,8 @@ def parse_github_url(url):
         parts = path.strip("/").split("/")
         if len(parts) >= 2:
             return parts[0], parts[1]
-    except Exception:
-        pass
+    except Exception as e:
+        print_error(f"Failed to parse URL '{url}': {e}")
     return None, None
 
 def get_repo_health_metrics(username, repo_name, token):
@@ -187,8 +187,18 @@ def get_detailed_repo_info(args, github_token):
                 if scraped_intel.get('latest_release'):
                      repo_data['scraped_release'] = scraped_intel.get('latest_release')
 
-        except Exception:
-            pass
+                # New OSINT metrics
+                repo_data['commits_count'] = scraped_intel.get('commits_count')
+                repo_data['branches_count'] = scraped_intel.get('branches_count')
+                repo_data['releases_count'] = scraped_intel.get('releases_count')
+                repo_data['has_wiki'] = scraped_intel.get('has_wiki')
+                repo_data['has_discussions'] = scraped_intel.get('has_discussions')
+                repo_data['has_packages'] = scraped_intel.get('has_packages')
+                repo_data['has_projects'] = scraped_intel.get('has_projects')
+                repo_data['languages_full'] = scraped_intel.get('languages_full')
+
+        except Exception as e:
+            print_warning(f"Hybrid intelligence gathering limited: {e}")
 
         # OSINT Upgrade: Fetch deep metadata
         try:
@@ -206,8 +216,8 @@ def get_detailed_repo_info(args, github_token):
             rel_resp = get_latest_release(owner, repo_name, github_token)
             if rel_resp.status_code == 200:
                 repo_data['osint_release'] = rel_resp.json()
-        except Exception:
-            pass
+        except Exception as e:
+            print_warning(f"Deep metadata fetch limited: {e}")
 
         # Add traffic analytics (requires push access)
         traffic_data = {}
@@ -230,8 +240,8 @@ def get_detailed_repo_info(args, github_token):
             if traffic_data:
                 repo_data['traffic'] = traffic_data
         except Exception as e:
-            # Silently fail for traffic data if permissions are missing, or log warning
-            pass
+            # Inform user if traffic data is unavailable (usually permissions)
+            print_warning(f"Traffic analytics unavailable (Check push permissions): {e}")
 
         # Add health metrics
         health_metrics = get_repo_health_metrics(owner, repo_name, github_token)

@@ -42,8 +42,9 @@ def check_for_updates():
                     confirm = input("Would you like to auto-update now? (y/n): ").lower()
                     if confirm == 'y':
                         perform_update()
-    except Exception:
-        pass
+    except Exception as e:
+        if os.environ.get("PYGITUP_DEBUG"):
+            print_warning(f"Update check skipped: {e}")
 
 def perform_update():
     """Executes a deep full-system update."""
