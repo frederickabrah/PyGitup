@@ -28,7 +28,8 @@ def extract_python_docs(content, filename):
                         method_args = [arg.arg for arg in item.args.args]
                         class_info['methods'].append({'name': item.name, 'params': ', '.join(method_args), 'docstring': method_doc})
                 docs['classes'].append(class_info)
-    except Exception: pass
+    except Exception as e:
+        print_warning(f"Technical extraction failed for {filename}: {e}")
     return docs
 
 def extract_javascript_docs(content, filename):
@@ -40,34 +41,34 @@ def extract_javascript_docs(content, filename):
         elif class_name: docs['classes'].append({'name': class_name, 'jsdoc': jsdoc.strip()})
     return docs
 
-# (Keep extract_go_docs, extract_cpp_docs, extract_java_docs as helper functions if needed, simplified here for brevity but assuming they exist)
+def extract_go_docs(content, filename):
+    docs = {'functions': []}
+    func_pattern = r'//\s*(\w+)\s*.*\nfunc\s+(\w+)\s*\([^)]*\)'
+    for match in re.finditer(func_pattern, content, re.DOTALL):
+        go_doc, func_name = match.groups()
+        docs['functions'].append({'name': func_name, 'go_doc': go_doc.strip()})
+    return docs
+
+def extract_cpp_docs(content, filename):
+    docs = {'functions': [], 'classes': []}
+    func_pattern = r'/\*!\s*\n(\s*\*\s*[^\n]*\n)*\s*\*/\s*\n\s*(?:[\w\s]+)\s+(\w+)\s*\([^)]*\)'
+    for match in re.finditer(func_pattern, content, re.DOTALL):
+        doxygen, func_name = match.groups()
+        docs['functions'].append({'name': func_name, 'doxygen': doxygen.strip()})
+    return docs
+
+def extract_java_docs(content, filename):
+    docs = {'classes': []}
+    javadoc_pattern = r'/\*\*\s*\n(\s*\*\s*[^\n]*\n)*\s*\*/\s*\n\s*(?:public|private|protected)?\s*(?:static\s+)?(?:final\s+)?class\s+(\w+)'
+    for match in re.finditer(javadoc_pattern, content, re.DOTALL):
+        javadoc, class_name = match.groups()
+        docs['classes'].append({'name': class_name, 'javadoc': javadoc.strip()})
+    return docs
 
 def core_generate_docs(config, repo_name, output_dir, github_username, github_token, use_ai=False):
     """Core logic for documentation generation, decoupled from CLI input."""
     generated_files = []
     os.makedirs(output_dir, exist_ok=True)
-
-    # AI README Option
-    ai_key = config["github"].get("ai_api_key")
-    if use_ai and ai_key:
-        repo_resp = get_repo_contents(github_username, repo_name, github_token)
-        if repo_resp.status_code == 200:
-            contents_list = repo_resp.json()
-            file_paths = [item['path'] for item in contents_list]
-            code_context = ""
-            priority_files = ["main.py", "setup.py", "requirements.txt", "README.md", "pyproject.toml", "index.js", "package.json"]
-            for item in contents_list:
-                if item['name'] in priority_files and item['type'] == 'file':
-                    f_resp = requests.get(item['download_url'])
-                    if f_resp.status_code == 200:
-                        snippet = "\n".join(f_resp.text.splitlines()[:150])
-                        code_context += f"\n--- FILE: {item['name']} ---\n{snippet}\n"
-            ai_readme = generate_ai_readme(ai_key, repo_name, "\n".join(file_paths), code_context)
-            if ai_readme:
-                path = os.path.join(output_dir, "README.md")
-                with open(path, 'w') as f: f.write(ai_readme)
-                generated_files.append(path)
-                return generated_files
 
     # Standard Generation
     try:
@@ -78,14 +79,28 @@ def core_generate_docs(config, repo_name, output_dir, github_username, github_to
         doc_content = f"# Documentation for {repo_name}\n\n## API Reference\n\n"
         
         for item in contents:
-            if item['type'] == 'file' and item['name'].endswith('.py'):
-                file_response = requests.get(item['download_url'])
-                if file_response.status_code == 200:
-                    docs = extract_python_docs(file_response.text, item['name'])
-                    if docs['functions'] or docs['classes']:
-                        doc_content += f"### Module: {item['name']}\n\n"
-                        for func in docs['functions']: doc_content += f"**`{func['name']}({func['params']})`**\n{func['docstring']}\n\n"
-                        for cls in docs['classes']: doc_content += f"**`class {cls['name']}`**\n{cls['docstring']}\n\n"
+            if item['type'] != 'file': continue
+            ext = os.path.splitext(item['name'])[1]
+            file_response = requests.get(item['download_url'])
+            if file_response.status_code != 200: continue
+            
+            content = file_response.text
+            if ext == '.py':
+                docs = extract_python_docs(content, item['name'])
+                if docs['functions'] or docs['classes']:
+                    doc_content += f"### Python Module: {item['name']}\n\n"
+                    for func in docs['functions']: doc_content += f"**`{func['name']}({func['params']})`**\n{func['docstring']}\n\n"
+                    for cls in docs['classes']: doc_content += f"**`class {cls['name']}`**\n{cls['docstring']}\n\n"
+            elif ext in ['.js', '.ts', '.tsx']:
+                docs = extract_javascript_docs(content, item['name'])
+                if docs['functions'] or docs['classes']:
+                    doc_content += f"### JS/TS Module: {item['name']}\n\n"
+                    for func in docs['functions']: doc_content += f"**`{func['name']}`**\n{func['jsdoc']}\n\n"
+            elif ext == '.go':
+                docs = extract_go_docs(content, item['name'])
+                if docs['functions']:
+                    doc_content += f"### Go Module: {item['name']}\n\n"
+                    for func in docs['functions']: doc_content += f"**`{func['name']}`**\n{func['go_doc']}\n\n"
 
         doc_path = os.path.join(output_dir, "API_REFERENCE.md")
         with open(doc_path, 'w') as f: f.write(doc_content)

@@ -125,8 +125,6 @@ Examples:
     # Multi-repo mode arguments
     parser.add_argument("--multi-repo", help="Comma-separated list of repositories")
     
-    # TODO scan mode arguments
-    parser.add_argument("--pattern", help="File patterns to scan for TODOs")
     parser.add_argument("--assign", help="Assignees for created issues")
     parser.add_argument("--no-assign", action="store_true", help="Don't assign issues")
     

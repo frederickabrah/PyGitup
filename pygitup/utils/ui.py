@@ -83,17 +83,28 @@ def display_repo_info(data):
         "Name": data.get("name"),
         "Owner": data.get("owner", {}).get("login"),
         "Visibility": "Private" if data.get("private") else "Public",
-        "Language": data.get("language"),
         "License": license_name,
         "Stars": str(data.get("stargazers_count")),
         "Forks": str(data.get("forks_count")),
-        "Watchers": str(data.get("subscribers_count", "N/A")), # API calls it subscribers_count
+        "Watchers": str(data.get("subscribers_count", "N/A")),
+        "Commits": data.get("commits_count", "N/A"),
+        "Branches": data.get("branches_count", "N/A"),
+        "Releases": data.get("releases_count", "0"),
         "Issues": f"{data.get('open_issues_count')} open",
         "Created": data.get("created_at"),
         "Clone URL": data.get("clone_url"),
         "Used By": data.get("used_by", "0"),
         "Sponsors": "💖 Active" if data.get("is_sponsored") else "None"
     }
+
+    # Features / Governance
+    features = []
+    if data.get('has_wiki'): features.append("📚 Wiki")
+    if data.get('has_discussions'): features.append("💬 Discussions")
+    if data.get('has_packages'): features.append("📦 Packages")
+    if data.get('has_projects'): features.append("📋 Projects")
+    if features:
+        fields["Features"] = " | ".join(features)
 
     if data.get("scraped_contributors"):
         fields["Contributors"] = data.get("scraped_contributors")
@@ -107,15 +118,10 @@ def display_repo_info(data):
     for label, value in fields.items():
         grid.add_row(f"{label}:", str(value))
 
-    # OSINT: Social Links
-    if data.get('social_links'):
-        grid.add_row("", "")
-        grid.add_row("[bold]Digital Footprint[/bold]", "")
-        for platform, url in data['social_links'].items():
-            grid.add_row(f"{platform}:", url)
-
     # OSINT: Languages Section
-    if 'osint_languages' in data and data['osint_languages']:
+    if data.get('languages_full'):
+        grid.add_row("Languages:", " ".join(data['languages_full']))
+    elif 'osint_languages' in data and data['osint_languages']:
         langs = data['osint_languages']
         total_bytes = sum(langs.values())
         lang_str = ""

@@ -6,7 +6,7 @@ from .ui import print_warning
 def extract_social_links(text):
     """Extracts social media links from text using regex."""
     if not text:
-        return []
+        return {}
     
     patterns = {
         "Twitter/X": r'https?://(www\.)?(twitter\.com|x\.com)/[a-zA-Z0-9_]+',
@@ -17,16 +17,6 @@ def extract_social_links(text):
         "Patreon": r'https?://(www\.)?patreon\.com/[a-zA-Z0-9_-]+'
     }
     
-    found = []
-    for platform, pattern in patterns.items():
-        matches = re.findall(pattern, text)
-        for match in matches:
-            # re.findall returns tuples if groups are present, or strings
-            # We need to reconstruct or just grab the full match if possible.
-            # Simplified approach: finditer for full match
-            pass
-    
-    # Better approach with finditer to get full URLs
     results = {}
     for platform, pattern in patterns.items():
         for match in re.finditer(pattern, text):
@@ -92,6 +82,43 @@ def scrape_repo_info(url):
         data['forks_count'] = get_count('/forks', 'repo-network-counter')
         data['open_issues_count'] = get_count('/issues')
         data['watchers_count'] = get_count('/watchers')
+
+        # --- Enhanced Activity Metrics ---
+        # 1. Commits Count
+        commit_link = soup.find('a', href=lambda x: x and '/commits/' in x)
+        if commit_link:
+            count_span = commit_link.find('span', class_='d-none d-sm-inline')
+            data['commits_count'] = re.sub(r'[^0-9,]', '', count_span.get_text(strip=True)) if count_span else "N/A"
+        
+        # 2. Branches Count
+        branch_link = soup.find('a', href=lambda x: x and '/branches' in x)
+        if branch_link:
+            count_span = branch_link.find('span', class_='Counter')
+            data['branches_count'] = count_span.get_text(strip=True) if count_span else "N/A"
+
+        # 3. Releases Count
+        release_link = soup.find('a', href=lambda x: x and '/releases' in x)
+        if release_link:
+            count_span = release_link.find('span', class_='Counter')
+            data['releases_count'] = count_span.get_text(strip=True) if count_span else "0"
+
+        # --- Governance & Community Tabs ---
+        data['has_wiki'] = bool(soup.find('a', id='wiki-tab'))
+        data['has_discussions'] = bool(soup.find('a', id='discussions-tab'))
+        data['has_projects'] = bool(soup.find('a', id='projects-tab'))
+        data['has_packages'] = bool(soup.find('a', href=lambda x: x and '/packages' in x))
+
+        # --- Advanced Language Intelligence ---
+        languages = []
+        lang_section = soup.find('h2', string=re.compile(r'Languages', re.I))
+        if lang_section:
+            lang_container = lang_section.find_parent('div')
+            if lang_container:
+                for item in lang_container.find_all('li', class_='d-inline'):
+                    text = item.get_text(separator=' ', strip=True)
+                    # Expected format: "Python 98.5%"
+                    languages.append(text)
+        data['languages_full'] = languages
 
         # --- Deep Footprint Scan (Description + README) ---
         all_text = data['description']
