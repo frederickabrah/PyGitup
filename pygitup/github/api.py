@@ -1,59 +1,256 @@
 import requests
 import base64
 import time
+import json
+import os
+from datetime import datetime, timedelta
+from typing import Dict, Optional, Tuple, Any, List, Union
+from dataclasses import dataclass
+from collections import defaultdict
+
+# Rate limit tracking
+_rate_limit_cache: Dict[str, Dict] = {}
+_abuse_detection_cache: Dict[str, list] = defaultdict(list)
+
+@dataclass
+class RateLimitInfo:
+    """GitHub API rate limit information."""
+    limit: int
+    remaining: int
+    reset_time: datetime
+    used: int
+    is_secondary: bool = False
+
+class PaginatedResponse:
+    """Wrapper for paginated API responses."""
+    def __init__(self, data: Any, status_code: int, headers: Dict[str, str]):
+        self.data = data
+        self.status_code = status_code
+        self.headers = headers
+    
+    def json(self) -> Any:
+        return self.data
+    
+    def raise_for_status(self):
+        """Raise HTTPError if status code indicates an error."""
+        if 400 <= self.status_code < 600:
+            raise requests.exceptions.HTTPError(f"HTTP Error: {self.status_code}")
+    
+    def __getitem__(self, key):
+        return self.data[key] if isinstance(self.data, dict) else self.data
+    
+    def __iter__(self):
+        if isinstance(self.data, list):
+            return iter(self.data)
+        raise TypeError("Response data is not iterable")
+
 
 def get_github_headers(token):
-    """Create standard GitHub API headers."""
+    """Create standard GitHub API headers with security enhancements."""
     return {
         "Authorization": f"token {token}",
-        "Accept": "application/vnd.github.v3+json"
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "PyGitUp/2.3.0 (Security-Enhanced)",
+        "X-GitHub-Api-Version": "2022-11-28"
     }
 
+
+def check_rate_limit(token: str) -> Optional[RateLimitInfo]:
+    """
+    Check current rate limit status without making an API call.
+    
+    Args:
+        token: GitHub token
+        
+    Returns:
+        RateLimitInfo or None if unavailable
+    """
+    try:
+        # Check cache first
+        if token in _rate_limit_cache:
+            cache = _rate_limit_cache[token]
+            if datetime.utcnow() < cache['expires']:
+                return RateLimitInfo(**cache['data'])
+        
+        # Query rate limit endpoint
+        response = github_request('GET', 'https://api.github.com/rate_limit', token)
+        
+        if response.status_code == 200:
+            data = response.json()
+            core = data.get('resources', {}).get('core', {})
+            
+            info = RateLimitInfo(
+                limit=core.get('limit', 5000),
+                remaining=core.get('remaining', 0),
+                reset_time=datetime.utcfromtimestamp(core.get('reset', 0)),
+                used=core.get('used', 0)
+            )
+            
+            # Cache for 5 minutes
+            _rate_limit_cache[token] = {
+                'data': {
+                    'limit': info.limit,
+                    'remaining': info.remaining,
+                    'reset_time': info.reset_time,
+                    'used': info.used,
+                    'is_secondary': False
+                },
+                'expires': datetime.utcnow() + timedelta(minutes=5)
+            }
+            
+            return info
+    except Exception as e:
+        if os.environ.get('PYGITUP_DEBUG'):
+            print(f"Could not check rate limit: {e}")
+    
+    return None
+
+
+def detect_abuse_pattern(token: str, endpoint: str) -> bool:
+    """
+    Detect potential abuse patterns in API usage.
+    
+    Args:
+        token: GitHub token
+        endpoint: API endpoint being called
+        
+    Returns:
+        True if abuse pattern detected
+    """
+    now = time.time()
+    key = f"{token[:8]}:{endpoint}"
+    
+    # Add to request history
+    _abuse_detection_cache[key].append(now)
+    
+    # Keep only last 60 seconds
+    _abuse_detection_cache[key] = [t for t in _abuse_detection_cache[key] if now - t < 60]
+    
+    # Check for abuse patterns
+    request_count = len(_abuse_detection_cache[key])
+    
+    # More than 30 requests per minute to same endpoint
+    if request_count > 30:
+        from ..utils.ui import print_warning
+        print_warning(f"⚠️ Abuse detection: High request rate to {endpoint} ({request_count}/min)")
+        return True
+    
+    return False
+
+
+def handle_rate_limit(response: requests.Response, token: str) -> Tuple[bool, int]:
+    """
+    Handle rate limit responses.
+    
+    Args:
+        response: GitHub API response
+        token: GitHub token
+        
+    Returns:
+        Tuple of (should_retry, sleep_duration)
+    """
+    if response.status_code == 403:
+        # Check if it's rate limiting or abuse detection
+        if 'X-RateLimit-Remaining' in response.headers:
+            remaining = int(response.headers.get('X-RateLimit-Remaining', 1))
+            if remaining == 0:
+                reset_time = int(response.headers.get('X-RateLimit-Reset', time.time() + 60))
+                sleep_duration = max(reset_time - time.time() + 1, 1)
+                return True, sleep_duration
+        
+        # Abuse detection (no rate limit headers)
+        if 'abuse' in response.text.lower() or 'too fast' in response.text.lower():
+            from ..utils.ui import print_warning
+            print_warning("⚠️ GitHub abuse detection triggered. Waiting 60 seconds...")
+            return True, 60
+    
+    elif response.status_code == 429:
+        # Too Many Requests
+        retry_after = int(response.headers.get('Retry-After', 60))
+        return True, retry_after
+    
+    return False, 0
+
+
 def github_request(method, url, token, paginate=False, **kwargs):
-    """Centralized GitHub API request handler with pagination and rate-limiting."""
+    """Centralized GitHub API request handler with enhanced rate-limiting and abuse detection."""
     headers = get_github_headers(token)
     if 'headers' in kwargs:
         headers.update(kwargs.pop('headers'))
-    
+
     results = []
     current_url = url
-    max_retries = 3
-    
+    max_retries = 5
+    consecutive_failures = 0
+
     try:
         while current_url:
             retry_count = 0
             response = None
-            
+
             while retry_count < max_retries:
                 try:
-                    response = requests.request(method, current_url, headers=headers, timeout=15, **kwargs)
+                    # Check for abuse patterns before making request
+                    if detect_abuse_pattern(token, current_url):
+                        from ..utils.ui import print_warning
+                        print_warning("⏸️ Pausing due to high request rate...")
+                        time.sleep(5)
                     
+                    response = requests.request(method, current_url, headers=headers, timeout=30, **kwargs)
+
                     # Handle rate limiting
-                    if response.status_code == 403 and 'X-RateLimit-Remaining' in response.headers:
-                        remaining = int(response.headers.get('X-RateLimit-Remaining', 1))
-                        if remaining == 0:
-                            reset_time = int(response.headers.get('X-RateLimit-Reset', time.time() + 60))
-                            sleep_duration = max(reset_time - time.time() + 1, 1)
-                            time.sleep(sleep_duration)
-                            continue # Retry the same URL after reset
+                    should_retry, sleep_duration = handle_rate_limit(response, token)
                     
-                    break # Success or non-retryable error
-                    
-                except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+                    if should_retry:
+                        from ..utils.ui import print_info
+                        print_info(f"⏳ Rate limited. Waiting {sleep_duration:.0f} seconds...")
+                        time.sleep(min(sleep_duration, 300))  # Cap at 5 minutes
+                        continue
+
+                    # Track rate limit info from response headers
+                    if 'X-RateLimit-Remaining' in response.headers:
+                        remaining = int(response.headers.get('X-RateLimit-Remaining', 0))
+                        if remaining < 100:
+                            from ..utils.ui import print_warning
+                            print_warning(f"⚠️ Rate limit warning: Only {remaining} requests remaining")
+                        if remaining < 10:
+                            from ..utils.ui import print_error
+                            print_error(f"🚨 Critical: Only {remaining} requests remaining!")
+
+                    # Success or non-retryable error
+                    consecutive_failures = 0
+                    break
+
+                except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
                     retry_count += 1
-                    if retry_count == max_retries: raise
-                    time.sleep(retry_count * 2)
-            
+                    consecutive_failures += 1
+                    
+                    if retry_count == max_retries:
+                        raise
+                    
+                    # Exponential backoff
+                    backoff_time = retry_count * 2
+                    from ..utils.ui import print_warning
+                    print_warning(f"⚠️ Request failed, retrying in {backoff_time}s... ({consecutive_failures} failures)")
+                    time.sleep(backoff_time)
+                    
+                    # If too many consecutive failures, add extra delay
+                    if consecutive_failures >= 3:
+                        from ..utils.ui import print_info
+                        print_info("⏸️ Multiple failures detected. Adding extra delay...")
+                        time.sleep(10)
+
             if not paginate:
                 return response
-                
+
             # Pagination logic
             data = response.json()
             if isinstance(data, list):
                 results.extend(data)
             else:
-                return response # Can't paginate non-list data
-                
+                # If non-list data is returned with paginate=True, return it wrapped
+                return PaginatedResponse(data, response.status_code, response.headers)
+
             # Check for next page
             current_url = None
             if 'Link' in response.headers:
@@ -62,20 +259,16 @@ def github_request(method, url, token, paginate=False, **kwargs):
                     if 'rel="next"' in link:
                         current_url = link.split(';')[0].strip('< >')
                         break
-        
-        # Return accumulated results as a MockResponse object
+
+        # Return accumulated results as a PaginatedResponse object
         if paginate:
-            class MockResponse:
-                def __init__(self, data, status, headers):
-                    self.data = data
-                    self.status_code = status
-                    self.headers = headers
-                def json(self): return self.data
-            return MockResponse(results, 200, response.headers)
-            
+            return PaginatedResponse(results, 200, response.headers)
+
     except requests.exceptions.RequestException as e:
-        # We need a dummy response for failures if caught at this level
-        # For CLI consistency, we just raise or return None
+        # Log the error for debugging
+        if os.environ.get('PYGITUP_DEBUG'):
+            from ..utils.ui import print_error
+            print_error(f"API request failed: {e}")
         raise e
 
 def graphql_request(query, variables, token):

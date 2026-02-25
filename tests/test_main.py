@@ -25,7 +25,8 @@ class TestPygitup(unittest.TestCase):
         config = load_config("non_existent_file.yaml")
         self.assertEqual(config, DEFAULT_CONFIG)
 
-    def test_load_config_custom(self):
+    @patch('pygitup.core.config.validate_config_path', return_value=True)
+    def test_load_config_custom(self, mock_validate):
         # Create a dummy config file
         custom_config_data = {
             "defaults": {
@@ -36,6 +37,7 @@ class TestPygitup(unittest.TestCase):
                 "username": "testuser"
             }
         }
+        # Use a path that would be valid or mock validation
         with open("test_config.yaml", "w") as f:
             yaml.dump(custom_config_data, f)
 
@@ -53,21 +55,14 @@ class TestPygitup(unittest.TestCase):
         # Clean up the dummy config file
         os.remove("test_config.yaml")
 
-    def test_get_github_token_from_file(self):
-        # Create a dummy token file
-        with open("test_token.txt", "w") as f:
-            f.write("test_token_from_file")
-
+    def test_get_github_token_from_config(self):
         config = {
             "github": {
-                "token_file": "test_token.txt"
+                "token": "test_token_from_config"
             }
         }
         token = get_github_token(config)
-        self.assertEqual(token, "test_token_from_file")
-
-        # Clean up the dummy token file
-        os.remove("test_token.txt")
+        self.assertEqual(token, "test_token_from_config")
 
     def test_get_github_token_from_env(self):
         # Set an environment variable
@@ -75,7 +70,7 @@ class TestPygitup(unittest.TestCase):
 
         config = {
             "github": {
-                "token_file": ""
+                "token": ""
             }
         }
         token = get_github_token(config)
@@ -93,21 +88,6 @@ class TestPygitup(unittest.TestCase):
         username = get_github_username(config)
         self.assertEqual(username, "testuser_from_config")
 
-    def test_get_github_username_from_env(self):
-        # Set an environment variable
-        os.environ["GITHUB_USERNAME"] = "testuser_from_env"
-
-        config = {
-            "github": {
-                "username": ""
-            }
-        }
-        username = get_github_username(config)
-        self.assertEqual(username, "testuser_from_env")
-
-        # Unset the environment variable
-        del os.environ["GITHUB_USERNAME"]
-
     @patch('pygitup.github.api.requests.request')
     def test_get_repo_info(self, mock_request):
         # Set up the mock response
@@ -119,11 +99,12 @@ class TestPygitup(unittest.TestCase):
         # Call the function
         response = get_repo_info("testuser", "test-repo", "test_token")
 
-        # Assert that requests.request was called correctly
+        # Assert that requests.request was called correctly (with timeout=15)
         mock_request.assert_called_once_with(
             "GET",
             "https://api.github.com/repos/testuser/test-repo",
-            headers={"Authorization": "token test_token", "Accept": "application/vnd.github.v3+json"}
+            headers={"Authorization": "token test_token", "Accept": "application/vnd.github.v3+json"},
+            timeout=15
         )
 
         # Assert that the function returns the mock response
@@ -145,6 +126,7 @@ class TestPygitup(unittest.TestCase):
             "POST",
             "https://api.github.com/user/repos",
             headers={"Authorization": "token test_token", "Accept": "application/vnd.github.v3+json"},
+            timeout=15,
             json={"name": "test-repo", "description": "A test repo", "private": True}
         )
 
@@ -169,6 +151,7 @@ class TestPygitup(unittest.TestCase):
             "PUT",
             "https://api.github.com/repos/testuser/test-repo/contents/hello.txt",
             headers={"Authorization": "token test_token", "Accept": "application/vnd.github.v3+json"},
+            timeout=15,
             json={"message": "Update hello.txt", "content": encoded_content, "sha": "abcde"}
         )
 

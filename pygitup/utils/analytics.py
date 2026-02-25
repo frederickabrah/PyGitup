@@ -41,7 +41,7 @@ def calculate_resolution_time(issues):
 
 def predict_growth_v2(current_stars, created_at_str, forks, health_score=None):
     """
-    Sophisticated growth prediction factoring in velocity, maintenance health, and momentum.
+    Growth prediction factoring in velocity, maintenance health, and momentum.
     """
     try:
         created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
@@ -91,15 +91,15 @@ def export_report(repo_name, data, format='json'):
         print_error(f"Export failed: {e}")
 
 def generate_analytics(github_username, github_token, config, args=None):
-    """Next-Gen Repository Intelligence & Predictive Analytics."""
-    print_header("Sophisticated Analytics & Reporting")
+    """Repository Intelligence & Predictive Analytics."""
+    print_header("Analytics & Reporting")
     
     if args and args.repo:
         repo_name = args.repo
     else:
         repo_name = input("Enter repository name: ")
 
-    print_info(f"Crunching deep data for {repo_name}...")
+    print_info(f"Analyzing data for {repo_name}...")
     report_data = {"repo_name": repo_name, "timestamp": datetime.now().isoformat()}
 
     try:

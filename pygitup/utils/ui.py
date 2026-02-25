@@ -90,11 +90,13 @@ def display_repo_info(data):
         "Commits": data.get("commits_count", "N/A"),
         "Branches": data.get("branches_count", "N/A"),
         "Releases": data.get("releases_count", "0"),
+        "Pull Requests": data.get("pull_requests_count", "N/A"),
         "Issues": f"{data.get('open_issues_count')} open",
         "Created": data.get("created_at"),
         "Clone URL": data.get("clone_url"),
         "Used By": data.get("used_by", "0"),
-        "Sponsors": "💖 Active" if data.get("is_sponsored") else "None"
+        "Sponsors": "💖 Active" if data.get("is_sponsored") else "None",
+        "CI Status": data.get("ci_status", "N/A")
     }
 
     # Features / Governance
@@ -103,6 +105,7 @@ def display_repo_info(data):
     if data.get('has_discussions'): features.append("💬 Discussions")
     if data.get('has_packages'): features.append("📦 Packages")
     if data.get('has_projects'): features.append("📋 Projects")
+    if data.get('has_security_policy'): features.append("🛡️ Security Policy")
     if features:
         fields["Features"] = " | ".join(features)
 

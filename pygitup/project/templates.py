@@ -5,7 +5,7 @@ from ..github.api import create_repo, update_file
 from ..core.config import get_github_username
 from ..utils.ui import print_success, print_error, print_info, print_header, console, Table, box
 
-# --- GOD TIER TEMPLATE DEFINITIONS ---
+# --- CORE PROJECT TEMPLATES ---
 
 FASTAPI_PRO = {
     "description": "Production-ready FastAPI backend with Docker & Tests",
@@ -108,22 +108,224 @@ setup(
     }
 }
 
-GOD_TEMPLATES = {
+NEXTJS_TAILWIND = {
+    "description": "Modern Next.js 14+ with Tailwind CSS & TypeScript",
+    "files": {
+        "package.json": """{
+  "name": "{{PROJECT_NAME}}",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "react": "^18",
+    "react-dom": "^18",
+    "next": "14.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10.0.1",
+    "postcss": "^8",
+    "tailwindcss": "^3.3.0",
+    "eslint": "^8",
+    "eslint-config-next": "14.1.0"
+  }
+}""",
+        "tsconfig.json": """{
+  "compilerOptions": {
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}""",
+        "src/app/page.tsx": """export default function Home() {
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-between p-24">
+      <div className="z-10 max-w-5xl w-full items-center justify-between font-monospace text-sm flex">
+        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
+          Get started by editing&nbsp;
+          <code className="font-bold">src/app/page.tsx</code>
+        </p>
+      </div>
+
+      <div className="relative flex place-items-center">
+        <h1 className="text-6xl font-bold text-center">
+          {{PROJECT_NAME}}
+        </h1>
+      </div>
+
+      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
+        <p className="text-sm opacity-50">
+          {{DESCRIPTION}}
+        </p>
+      </div>
+    </main>
+  )
+}
+""",
+        "src/app/layout.tsx": """import './globals.css'
+import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
+
+const inter = Inter({ subsets: ['latin'] })
+
+export const metadata: Metadata = {
+  title: '{{PROJECT_NAME}}',
+  description: '{{DESCRIPTION}}',
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body className={inter.className}>{children}</body>
+    </html>
+  )
+}
+""",
+        "src/app/globals.css": """@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+}
+""",
+        "README.md": """# {{PROJECT_NAME}}
+{{DESCRIPTION}}
+
+## Getting Started
+`npm install && npm run dev`
+"""
+    }
+}
+
+RUST_MICROSERVICE = {
+    "description": "High-performance Rust service using Axum & Tokio",
+    "files": {
+        "Cargo.toml": """[package]
+name = "{{PROJECT_NAME}}"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = "0.7"
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tower-http = { version = "0.5", features = ["cors"] }
+""",
+        "src/main.rs": """use axum::{
+    routing::get,
+    Json, Router,
+};
+use serde::Serialize;
+use std::net::SocketAddr;
+
+#[derive(Serialize)]
+struct Status {
+    message: String,
+    service: String,
+}
+
+#[tokio::main]
+async fn main() {
+    let app = Router::new()
+        .route("/", get(handler));
+
+    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    println!("🚀 {{PROJECT_NAME}} listening on {}", addr);
+    
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    axum::serve(listener, app).await.unwrap();
+}
+
+async fn handler() -> Json<Status> {
+    Json(Status {
+        message: "Hello from Rust!".to_string(),
+        service: "{{PROJECT_NAME}}".to_string(),
+    })
+}
+""",
+        ".gitignore": """target/
+Cargo.lock
+""",
+        "README.md": """# {{PROJECT_NAME}}
+{{DESCRIPTION}}
+
+## Build & Run
+`cargo run`
+"""
+    }
+}
+
+PROJECT_TEMPLATES = {
     "fastapi-pro": FASTAPI_PRO,
     "express-node": NODE_EXPRESS,
-    "cli-python": CLI_TOOL_PYTHON
+    "cli-python": CLI_TOOL_PYTHON,
+    "nextjs-tailwind": NEXTJS_TAILWIND,
+    "rust-microservice": RUST_MICROSERVICE
 }
 
 def get_template_input(config, args=None):
     """Interactive template selector with rich UI."""
-    print_header("God Mode Template Marketplace")
+    print_header("Project Architecture Marketplace")
     
     table = Table(title="Available Architectures", box=box.ROUNDED)
     table.add_column("ID", style="cyan")
     table.add_column("Template Name", style="bold white")
     table.add_column("Description", style="dim")
     
-    for i, (name, details) in enumerate(GOD_TEMPLATES.items(), 1):
+    for i, (name, details) in enumerate(PROJECT_TEMPLATES.items(), 1):
         table.add_row(str(i), name, details["description"])
     
     console.print(table)
@@ -134,9 +336,9 @@ def get_template_input(config, args=None):
     selected_name = None
     if choice.isdigit():
         idx = int(choice) - 1
-        if 0 <= idx < len(GOD_TEMPLATES):
-            selected_name = list(GOD_TEMPLATES.keys())[idx]
-    elif choice in GOD_TEMPLATES:
+        if 0 <= idx < len(PROJECT_TEMPLATES):
+            selected_name = list(PROJECT_TEMPLATES.keys())[idx]
+    elif choice in PROJECT_TEMPLATES:
         selected_name = choice
         
     if not selected_name:
@@ -144,7 +346,7 @@ def get_template_input(config, args=None):
         return None, None, None, None
 
     repo_name = input("📦 Target Repository Name: ").strip()
-    description = input("📝 Short Description: ").strip() or GOD_TEMPLATES[selected_name]["description"]
+    description = input("📝 Short Description: ").strip() or PROJECT_TEMPLATES[selected_name]["description"]
     is_private = input("🔒 Make Private? (y/n) [y]: ").lower() != 'n'
     
     variables = {
@@ -156,8 +358,8 @@ def get_template_input(config, args=None):
     return selected_name, repo_name, variables, is_private
 
 def core_deploy_template(template_name, repo_name, description, is_private, github_username, github_token, config):
-    """Core logic for deploying a template to GitHub, decoupled from CLI input."""
-    if template_name not in GOD_TEMPLATES:
+    """Core logic for deploying a template to GitHub with rollback support."""
+    if template_name not in PROJECT_TEMPLATES:
         return False, "Template not found."
 
     variables = {
@@ -172,19 +374,30 @@ def core_deploy_template(template_name, repo_name, description, is_private, gith
         return False, f"Cloud initialization failed: {resp.text}"
 
     # 2. Deploy Template Files
-    template = GOD_TEMPLATES[template_name]
-    success_count = 0
-    for path, content in template["files"].items():
-        # Render variables
-        final_content = content
-        for k, v in variables.items():
-            final_content = final_content.replace(f"{{{{{k}}}}}", v)
-            
-        f_resp = update_file(github_username, repo_name, path, final_content.encode('utf-8'), github_token, f"chore: initialize {path} from template")
-        if f_resp.status_code in [200, 201]:
-            success_count += 1
-            
-    return True, f"Deployed {success_count} files to {github_username}/{repo_name}."
+    template = PROJECT_TEMPLATES[template_name]
+    deployed_files = []
+    
+    try:
+        for path, content in template["files"].items():
+            # Render variables
+            final_content = content
+            for k, v in variables.items():
+                final_content = final_content.replace(f"{{{{{k}}}}}", v)
+                
+            f_resp = update_file(github_username, repo_name, path, final_content.encode('utf-8'), github_token, f"chore: initialize {path} from template")
+            if f_resp.status_code in [200, 201]:
+                deployed_files.append(path)
+            else:
+                raise RuntimeError(f"Failed to deploy {path}: {f_resp.text}")
+                
+        return True, f"Deployed {len(deployed_files)} files to {github_username}/{repo_name}."
+        
+    except Exception as e:
+        print_error(f"Deployment failed: {e}. Initiating rollback...")
+        # Rollback: Delete the failed repository to prevent broken state
+        from ..github.api import delete_repo_api
+        delete_repo_api(github_username, repo_name, github_token)
+        return False, f"Deployment failed and repository was removed: {e}"
 
 def create_project_from_template(github_username, github_token, config, args=None):
     """CLI Wrapper for template orchestration."""

@@ -157,12 +157,12 @@ def get_detailed_repo_info(args, github_token):
 
         repo_data = repo_response.json()
 
-        # Hybrid Intelligence: Scrape data that API hides
+        # Enhanced Intelligence: Scrape data that API hides
         try:
             full_url = f"https://github.com/{owner}/{repo_name}"
             scraped_intel = scrape_repo_info(full_url)
             if scraped_intel:
-                # Merge unique OSINT data
+                # Merge unique data
                 repo_data['used_by'] = scraped_intel.get('used_by')
                 repo_data['is_sponsored'] = scraped_intel.get('is_sponsored')
                 repo_data['topics'] = scraped_intel.get('topics', []) or repo_data.get('topics', [])
@@ -187,20 +187,23 @@ def get_detailed_repo_info(args, github_token):
                 if scraped_intel.get('latest_release'):
                      repo_data['scraped_release'] = scraped_intel.get('latest_release')
 
-                # New OSINT metrics
+                # Extended metrics
                 repo_data['commits_count'] = scraped_intel.get('commits_count')
                 repo_data['branches_count'] = scraped_intel.get('branches_count')
                 repo_data['releases_count'] = scraped_intel.get('releases_count')
+                repo_data['pull_requests_count'] = scraped_intel.get('pull_requests_count')
                 repo_data['has_wiki'] = scraped_intel.get('has_wiki')
                 repo_data['has_discussions'] = scraped_intel.get('has_discussions')
                 repo_data['has_packages'] = scraped_intel.get('has_packages')
                 repo_data['has_projects'] = scraped_intel.get('has_projects')
+                repo_data['has_security_policy'] = scraped_intel.get('has_security_policy')
+                repo_data['ci_status'] = scraped_intel.get('ci_status')
                 repo_data['languages_full'] = scraped_intel.get('languages_full')
 
         except Exception as e:
-            print_warning(f"Hybrid intelligence gathering limited: {e}")
+            print_warning(f"Data gathering limited: {e}")
 
-        # OSINT Upgrade: Fetch deep metadata
+        # Metadata Analysis: Fetch deep metadata
         try:
             # Languages
             lang_resp = get_repo_languages(owner, repo_name, github_token)

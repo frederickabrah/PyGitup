@@ -12,7 +12,7 @@ try:
     HAS_CRYPTO = True
 except ImportError:
     HAS_CRYPTO = False
-from ..utils.ui import print_success, print_error, print_info, print_header, print_warning
+from ..utils.ui import print_success, print_error, print_info, print_header, print_warning, console
 
 # Default configuration
 DEFAULT_CONFIG = {
@@ -71,14 +71,9 @@ def get_master_key(salt):
     global _SESSION_KEY
     if _SESSION_KEY: return _SESSION_KEY
     
-    # In a real CLI flow, we might prompt once per session.
-    # For now, to avoid UI blocking in deep calls, we check env var or prompt.
-    password = os.environ.get("PYGITUP_PASSWORD")
-    if not password:
-        print_warning("🔐 Vault Locked: Master Password required for this session.")
-        password = getpass.getpass("🔑 Enter Master Password: ")
-        # Cache it in env for this session only
-        os.environ["PYGITUP_PASSWORD"] = password
+    # Securely prompt for password once per session
+    print_warning("🔐 Vault Locked: Master Password required for this session.")
+    password = getpass.getpass("🔑 Enter Master Password: ")
     
     _SESSION_KEY = derive_key(password, salt)
     return _SESSION_KEY
@@ -109,7 +104,7 @@ def decrypt_data(data, salt):
     try:
         key = get_master_key(salt)
         f = Fernet(key)
-        return f.decrypt(data.encode()).decode()
+        return f.decrypt(data.encode()).decode().strip()
     except Exception:
         # Don't print error here to avoid noise during background loads,
         # but return empty to signify failure.
@@ -140,7 +135,9 @@ def get_active_profile_path():
             with open(settings_path, 'r') as f:
                 settings = json.load(f)
                 active_profile = settings.get("active_profile", "default")
-        except Exception: pass
+        except (json.JSONDecodeError, IOError):
+            # Fallback to default if settings are corrupted or unreadable
+            active_profile = "default"
     return os.path.join(config_dir, "profiles", f"{active_profile}.yaml")
 
 def set_active_profile(profile_name):
@@ -165,7 +162,7 @@ def list_profiles():
     return [f.replace(".yaml", "") for f in os.listdir(profiles_dir) if f.endswith(".yaml")]
 
 def load_config(config_path=None):
-    """Load configuration from the active stealth profile."""
+    """Load configuration from the active profile."""
     config = copy.deepcopy(DEFAULT_CONFIG)
     if config_path is None:
         config_path = get_active_profile_path()
@@ -180,17 +177,22 @@ def load_config(config_path=None):
             with open(config_path, 'r') as f:
                 file_config = yaml.safe_load(f)
                 if file_config:
+                    # Deep merge: copy ALL sections from file_config to config
                     for section in file_config:
-                        if section in config:
+                        if section in config and isinstance(config[section], dict) and isinstance(file_config[section], dict):
                             config[section].update(file_config[section])
-                    
+                        else:
+                            # For non-dict sections or new sections, just copy
+                            config[section] = file_config[section]
+
                     # Extract salt and decrypt
                     salt_hex = config.get("security", {}).get("salt", "")
                     if salt_hex:
                         salt = bytes.fromhex(salt_hex)
                         config["github"]["token"] = decrypt_data(config["github"].get("token"), salt)
                         config["github"]["ai_api_key"] = decrypt_data(config["github"].get("ai_api_key"), salt)
-        except Exception as e: print_warning(f"Could not load stealth config: {e}")
+        except Exception as e: 
+            print_warning(f"Could not load config: {e}")
     return config
 
 def get_github_token(config):
@@ -205,7 +207,7 @@ def get_github_username(config):
     return user.strip() if user else ""
 
 def configuration_wizard(profile_name=None):
-    """Guides the user through one-time stealth setup with PBKDF2 encryption."""
+    """Guides the user through one-time encrypted setup."""
     print_header("PyGitUp Secure Setup")
     if not profile_name:
         profile_name = input("🏷️ Enter profile name [default]: ") or "default"
@@ -216,17 +218,23 @@ def configuration_wizard(profile_name=None):
 
     if os.path.exists(config_path):
         print_warning(f"Profile '{profile_name}' already exists.")
-        print("1: [red]Overwrite[/red] | 2: [green]Fill Missing[/green] | 3: [white]Cancel[/white]")
-        choice = input("\n👉 Choice: ")
+        console.print("\n[bold]Choose an action:[/bold]")
+        console.print("  1: [red]Overwrite[/red] (Reset all credentials)")
+        console.print("  2: [green]Fill Missing[/green] (Keep existing, add new ones)")
+        console.print("  3: [white]Cancel[/white]")
+        
+        choice = input("\n👉 Choice: ").strip()
         if choice == '3': return
         if choice == '2':
             mode = "fill_missing"
             try:
                 with open(config_path, 'r') as f:
                     existing_config = yaml.safe_load(f) or {}
-            except Exception: pass
+            except (yaml.YAMLError, IOError) as e:
+                print_warning(f"Could not read existing profile: {e}. Starting fresh.")
+                existing_config = {}
 
-    print_info(f"Configuring: {profile_name} ({mode})")
+    console.print(f"\n[cyan]Context: {profile_name}[/cyan] | Mode: {mode}\n")
     
     # 1. Set Master Password
     password = getpass.getpass("🔐 Set Master Password for this profile: ")
@@ -243,12 +251,10 @@ def configuration_wizard(profile_name=None):
     
     config = copy.deepcopy(DEFAULT_CONFIG)
     if mode == "fill_missing" and existing_config:
-        # We need the OLD salt/password to decrypt the OLD data if we want to preserve it
-        # But for simplicity in this "Reset", we might just overwrite fields.
-        # A true merge would require decrypting old data first.
-        # For now, we assume user is re-entering credentials or we just merge non-sensitive.
+        # Transfer existing non-sensitive config
         for section in existing_config:
-            if section in config: config[section].update(existing_config[section])
+            if section in config and section != "security":
+                config[section].update(existing_config[section])
 
     u = input(f"GitHub Username: ").strip()
     if u: config["github"]["username"] = u

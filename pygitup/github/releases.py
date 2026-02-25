@@ -1,6 +1,7 @@
 import os
 import subprocess
 import tempfile
+import re
 from .api import create_release, get_commit_history
 from ..utils.ui import print_success, print_error, print_info, print_header, print_warning, console
 from ..utils.ai import generate_ai_release_notes
