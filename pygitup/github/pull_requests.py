@@ -80,6 +80,17 @@ def request_code_review(github_username, github_token, config, args=None):
     else:
         repo_name = inquirer.prompt([inquirer.Text("repo", message="Enter the repository name")])["repo"]
 
+    # TECHNICAL VALIDATION: Ensure current directory matches the target repo
+    try:
+        remote_res = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True, text=True)
+        if repo_name.lower() not in remote_res.stdout.lower():
+            print_error(f"Context Mismatch: Current directory is not '{repo_name}'.")
+            print_info("Please 'cd' into the correct repository before requesting a review.")
+            return
+    except Exception:
+        print_error("Not a git repository.")
+        return
+
     # Create a new branch for the review
     branch_name = f"review-{int(time.time())}"
 
@@ -109,9 +120,12 @@ def request_code_review(github_username, github_token, config, args=None):
             else:
                 print_warning("No changes detected in the specified files relative to the current branch.")
 
-        # Push the new branch to GitHub (even if no new commit, in case branch is new)
-        subprocess.run(["git", "push", "-u", "origin", branch_name], check=True)
-        print_info("Pushed the new branch to GitHub.")
+        # TECHNICAL UPGRADE: Credentialed Push
+        # We inject the token into the push URL to ensure success
+        push_url = f"https://{github_token}@github.com/{github_username}/{repo_name}.git"
+        print_info(f"Synchronizing review branch with GitHub...")
+        subprocess.run(["git", "push", "-u", push_url, branch_name], check=True, capture_output=True)
+        print_success("Pushed the new branch to GitHub.")
 
         reviewers = []
         if args and args.reviewers:

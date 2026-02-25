@@ -1,6 +1,6 @@
 # PyGitUp User Manual
 
-**Version:** 2.4.0 (Security-Enhanced)  
+**Version:** 2.4.1 (Security-Enhanced)  
 **Last Updated:** February 22, 2026
 
 ---
@@ -678,7 +678,7 @@ python pygitup.py --mode tui
 ║  │             │  │                                  │  ║
 ║  └─────────────┘  └──────────────────────────────────┘  ║
 ╠══════════════════════════════════════════════════════════╣
-║  Status Bar: ● Online | Profile: default | v2.4.0       ║
+║  Status Bar: ● Online | Profile: default | v2.4.1       ║
 ║  Footer: [q] Quit [←/→] Navigate [Enter] Select         ║
 ╚══════════════════════════════════════════════════════════╝
 ```
@@ -1128,5 +1128,5 @@ A: Yes! Use `--batch` mode for non-interactive execution.
 
 ---
 
-**PyGitUp v2.4.0** - Professional GitHub Automation & Security Platform  
+**PyGitUp v2.4.1** - Professional GitHub Automation & Security Platform  
 **License:** MIT | **Author:** Frederick Abraham

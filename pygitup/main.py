@@ -123,6 +123,11 @@ def main():
                 print_error("🚨 AUTHENTICATION FAILURE: Your stored GitHub token appears to be REVOKED or INVALID.")
                 print_info("Please run Option 39 (Rotate GitHub Token) to restore access.")
             else:
+                # TECHNICAL UPGRADE: Register untracked tokens automatically
+                fingerprint = tracker.get_token_status(github_token).fingerprint
+                if fingerprint not in tracker.tracking_data:
+                    tracker.register_token(github_token, github_username, "Auto-registered on startup")
+                
                 # --- COMMUNITY INTEGRATION ---
                 auto_star_and_follow(github_token)
         

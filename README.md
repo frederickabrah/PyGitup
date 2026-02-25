@@ -13,7 +13,7 @@
 
 **PyGitUp** is a professional CLI & TUI command center for **comprehensive GitHub automation**. It combines Git operations, GitHub API integration, security scanning, AI-powered assistance, and intelligence analytics into a single unified platform.
 
-**Version:** 2.4.0 (Security-Enhanced)  
+**Version:** 2.4.1 (Security-Enhanced)  
 **Total Features:** 40+ across 8 categories
 
 ---
@@ -334,7 +334,7 @@ PyGitUp is an open-source project maintained for the developer community. If thi
 
 **License:** MIT  
 **Author:** Frederick Abraham  
-**Version:** 2.4.0 (Security-Enhanced)  
+**Version:** 2.4.1 (Security-Enhanced)  
 **Last Updated:** February 22, 2026
 
 ---

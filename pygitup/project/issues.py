@@ -223,8 +223,11 @@ Provide a step-by-step resolution plan and example code if possible.
                     if analysis:
                         print(f"[DEBUG] AI response preview: {analysis[:200]}...")
                 
-                if analysis and len(analysis.strip()) > 0:
+                if analysis and not analysis.startswith("AI Error:"):
                     console.print(Panel(analysis, title=f"AI Triage Report: Issue #{target}", border_style="green"))
+                elif analysis and analysis.startswith("AI Error:"):
+                    print_error(f"{analysis}")
+                    print_info("Please check your internet connection or API key usage limits.")
                 else:
                     print_warning("AI returned empty response.")
                     print_info("This could be due to: 1) Rate limiting, 2) Invalid prompt, 3) API temporarily unavailable")

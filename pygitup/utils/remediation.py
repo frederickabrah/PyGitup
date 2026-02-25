@@ -555,7 +555,14 @@ def interactive_commit_manager():
 
         selected = commits[idx]
         console.print(f"\n[bold cyan]Managing Commit:[/bold cyan] {selected['hash']} ('{selected['msg']}')")
-        console.print("  1: [yellow]Edit Message[/yellow]")
+        
+        # Technical Warning: Deep Rebase Risk
+        if idx > 5:
+            console.print("\n[bold yellow]⚠️  TECHNICAL WARNING:[/bold yellow] Deep history modification detected.")
+            console.print("   Modifying older commits (5+ back) often causes merge conflicts.")
+            console.print("   PyGitUp will create a backup, but proceed with caution.")
+
+        console.print("\n  1: [yellow]Edit Message[/yellow]")
         console.print("  2: [red]Delete (Drop) Commit[/red]")
         console.print("  3: [white]Cancel[/white]")
         

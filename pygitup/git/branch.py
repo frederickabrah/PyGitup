@@ -17,6 +17,9 @@ def manage_branches(args):
             )
         ]
         answers = inquirer.prompt(questions)
+        if not answers:
+            print_info("Operation cancelled.")
+            return
         action = answers["action"]
 
         if action in ["create", "delete", "switch"]:
@@ -24,6 +27,9 @@ def manage_branches(args):
                 inquirer.Text("branch_name", message=f"Enter the name of the branch to {action}")
             ]
             branch_answers = inquirer.prompt(branch_questions)
+            if not branch_answers:
+                print_info("Operation cancelled.")
+                return
             branch_name = branch_answers["branch_name"]
 
     try:
