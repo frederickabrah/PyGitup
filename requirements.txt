@@ -8,3 +8,5 @@ beautifulsoup4
 pytest
 textual
 cryptography
+js-yaml
+glob2
