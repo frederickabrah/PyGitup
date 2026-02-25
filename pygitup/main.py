@@ -178,6 +178,11 @@ def main():
                     '38': ("📄 Generate SBOM (Software Bill of Materials)", "generate-sbom"),
                     '39': ("🔄 Rotate GitHub Token", "rotate-token"),
                     '40': ("📋 Interactive Issue Triage & AI Analysis", "issue-triage"),
+                    '41': ("↩️  Undo Last Commit (Soft Reset)", "undo-commit"),
+                    '42': ("🧹 Purge File from Git History", "purge-file"),
+                    '43': ("✂️  Purge Sensitive String from History", "purge-string"),
+                    '44': ("📝 Interactive History Editor (Edit/Delete Commits)", "edit-history"),
+                    '45': ("📖 Remediation Help & Guide", "remediation-help"),
                     '0': ("Exit PyGitUp", "exit")
                 }
 
@@ -438,6 +443,23 @@ def main():
                     print_error("No current token found to rotate.")
             elif mode == "issue-triage":
                 list_and_triage_issues(github_username, github_token, config, args)
+            elif mode == "undo-commit":
+                from .utils.remediation import undo_last_commit
+                undo_last_commit()
+            elif mode == "purge-file":
+                from .utils.remediation import purge_file_from_history
+                file_to_purge = args.file if args and args.file else input("Enter filename to purge from history: ")
+                purge_file_from_history(file_to_purge)
+            elif mode == "purge-string":
+                from .utils.remediation import purge_string_from_history
+                secret_str = args.string if args and args.string else input("Enter exact string to redact from history: ")
+                purge_string_from_history(secret_str)
+            elif mode == "edit-history":
+                from .utils.remediation import interactive_commit_manager
+                interactive_commit_manager()
+            elif mode == "remediation-help":
+                from .utils.remediation import show_remediation_help
+                show_remediation_help()
             # === END SECURITY FEATURES ===
             else:
                 print_error("Invalid mode selected.")

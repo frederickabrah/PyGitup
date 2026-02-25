@@ -18,7 +18,7 @@ Examples:
     
     parser.add_argument(
         "--mode", 
-        choices=["project", "file", "batch", "template", "release", "multi-repo", "scan-todos", "offline-queue", "process-queue", "request-review", "smart-push", "generate-docs", "analytics", "configure", "branch", "stash", "tag", "cherry-pick", "gist", "webhook", "actions", "pr", "audit", "visibility", "repo-info", "delete-repo", "bulk-mgmt", "migrate", "fork-intel", "ai-commit", "ai-diagnostic", "ssh-setup", "tui", "rotate-token"],
+        choices=["project", "file", "batch", "template", "release", "multi-repo", "scan-todos", "offline-queue", "process-queue", "request-review", "smart-push", "generate-docs", "analytics", "configure", "branch", "stash", "tag", "cherry-pick", "gist", "webhook", "actions", "pr", "audit", "visibility", "repo-info", "delete-repo", "bulk-mgmt", "migrate", "fork-intel", "ai-commit", "ai-diagnostic", "ssh-setup", "tui", "rotate-token", "undo-commit", "purge-file", "purge-string", "edit-history"],
         help="Operation mode"
     )
 
@@ -139,10 +139,13 @@ Examples:
     
     # Analytics mode arguments
     parser.add_argument("--period", help="Period for analytics report")
-    
+
+    # Advanced Options
+    parser.add_argument("--string", help="Specific sensitive string to purge from history")
+
     # Configuration arguments
     parser.add_argument("--config", help="Path to configuration file")
     parser.add_argument("--batch", action="store_true", help="Run in batch mode (used internally)")
     parser.add_argument("--dry-run", action="store_true", help="Simulate the execution of the command without making any changes.")
-    
+
     return parser
