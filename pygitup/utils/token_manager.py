@@ -221,12 +221,7 @@ class TokenExpirationTracker:
         tracking_info = self.tracking_data.get(fingerprint, {})
         
         # Get token details from GitHub API
-        github_token = os.environ.get('GITHUB_TOKEN', '')
-        if not github_token:
-            # Try to get from config
-            from ..core.config import load_config, get_github_token
-            config = load_config()
-            github_token = get_github_token(config)
+        github_token = token
         
         # Query GitHub for token details
         token_info = self._fetch_token_info(github_token)
@@ -241,10 +236,14 @@ class TokenExpirationTracker:
         organization = None
         
         if token_info:
-            # Parse token information from API
-            created_at_str = token_info.get('created_at')
-            if created_at_str:
-                created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
+            # TECHNICAL FIX: prioritize local registration date for accuracy
+            if tracking_info.get('registered_at'):
+                created_at = datetime.fromisoformat(tracking_info['registered_at'])
+            else:
+                # Fallback to API if not tracked locally (often account creation date)
+                created_at_str = token_info.get('created_at')
+                if created_at_str:
+                    created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
 
             expires_at_str = token_info.get('expires_at')
             if expires_at_str:

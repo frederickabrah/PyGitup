@@ -74,17 +74,17 @@ def call_gemini_api(api_key, prompt, timeout=30):
         return None
         
     models = [
-        ("gemini-3.1-pro", "v1beta"),
-        ("gemini-3-flash", "v1beta"),
+        ("gemini-3.1-pro-preview", "v1beta"),
+        ("gemini-3-pro-preview", "v1beta"),
         ("gemini-2.5-pro", "v1beta"),
         ("gemini-2.5-flash", "v1beta"),
-        ("gemini-2.0-flash", "v1beta"), 
-        ("gemini-1.5-pro", "v1beta"),
-        ("gemini-1.5-flash", "v1beta"),
-        ("gemini-1.5-pro", "v1"),
-        ("gemini-1.5-flash", "v1")
+        ("gemini-2.0-flash", "v1beta"),
+        ("gemini-2.5-pro", "v1"),
+        ("gemini-2.5-flash", "v1"),
+        ("gemini-2.0-flash", "v1")
     ]
     
+    last_err = "No successful model connection."
     for model, version in models:
         url = f"https://generativelanguage.googleapis.com/{version}/models/{model}:generateContent"
         headers = {
@@ -93,22 +93,28 @@ def call_gemini_api(api_key, prompt, timeout=30):
         }
         payload = {"contents": [{"role": "user", "parts": [{"text": prompt}]}]}
         
-        for attempt in range(2):
+        # INCREASED RETRIES with Jittered Backoff
+        for attempt in range(3): 
             try:
                 resp = requests.post(url, json=payload, headers=headers, timeout=15)
                 if resp.status_code == 200:
                     data = resp.json()
                     if data.get('candidates'):
                         return data['candidates'][0]['content']['parts'][0]['text'].strip()
+                    last_err = f"[{model}] No candidates in response."
                 elif resp.status_code == 429: # Rate limit
-                    time.sleep(2 ** attempt)
-                    continue
+                    wait_time = (2 ** attempt) + 1
+                    print_warning(f"⚠️  Rate limit hit for {model}. Retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+                    continue # Try this model again
                 else:
-                    break # Try next model/version
-            except (requests.exceptions.RequestException, KeyError, IndexError):
+                    last_err = f"[{model}] HTTP {resp.status_code}: {resp.text[:100]}"
+                    break # Try next model family
+            except Exception as e:
+                last_err = f"Connection error: {str(e)}"
                 time.sleep(1)
                 continue
-    return None
+    return f"AI Error: {last_err}"
 
 def generate_ai_commit_message(api_key, diff_text):
     prompt = f"Write a Conventional Commit for this diff:\n{diff_text[:5000]}"
@@ -250,15 +256,14 @@ def code_mentor_chat(api_key, query, code_context, history=None):
 
     # 4. Call API with rotation and fallback support
     models = [
-        ("gemini-3.1-pro", "v1beta"),
-        ("gemini-3-flash", "v1beta"),
+        ("gemini-3.1-pro-preview", "v1beta"),
+        ("gemini-3-pro-preview", "v1beta"),
         ("gemini-2.5-pro", "v1beta"),
         ("gemini-2.5-flash", "v1beta"),
         ("gemini-2.0-flash", "v1beta"),
-        ("gemini-1.5-pro", "v1beta"),
-        ("gemini-1.5-flash", "v1beta"),
-        ("gemini-1.5-pro", "v1"),
-        ("gemini-1.5-flash", "v1")
+        ("gemini-2.5-pro", "v1"),
+        ("gemini-2.5-flash", "v1"),
+        ("gemini-2.0-flash", "v1")
     ]
     last_err = "No successful model connection."
     
@@ -332,7 +337,12 @@ def ai_diagnostics_workflow(config, command, tui_app=None):
 def ai_commit_workflow(github_username, github_token, config):
     api_key = config["github"].get("ai_api_key")
     diff = get_git_diff()
-    if not diff: return False
+    if not diff:
+        print_warning("No staged changes detected.")
+        print_info("Use 'git add <files>' to stage changes before using AI Commit.")
+        return False
+    
+    print_info("Analyzing staged changes...")
     msg = generate_ai_commit_message(api_key, diff)
     if msg:
         print(f"Proposed: {msg}")

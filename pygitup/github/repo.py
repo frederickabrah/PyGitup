@@ -29,6 +29,9 @@ def manage_repo_visibility(args, github_username, github_token):
             ))
             
         answers = inquirer.prompt(questions)
+        if not answers:
+            print_info("Operation cancelled.")
+            return
         
         if not repo_name:
             repo_name = answers["repo"]
@@ -67,6 +70,9 @@ def delete_repository(args, github_username, github_token):
         print_header("Delete Repository")
         questions = [inquirer.Text("repo", message="Enter the name of the repository to DELETE")]
         answers = inquirer.prompt(questions)
+        if not answers:
+            print_info("Operation cancelled.")
+            return
         repo_name = answers["repo"]
 
     if not repo_name:

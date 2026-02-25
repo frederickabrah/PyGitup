@@ -1,6 +1,6 @@
 # 🚀 PyGitUp Complete Capabilities Guide
 
-**Version:** 2.4.0 (Security-Enhanced)  
+**Version:** 2.4.1 (Security-Enhanced)  
 **Last Updated:** February 22, 2026  
 **Total Features:** 40+ across 8 categories
 
@@ -617,6 +617,6 @@ python pygitup.py --mode <mode> --help
 
 ---
 
-**PyGitUp v2.4.0** - Professional GitHub Automation & Security Platform  
+**PyGitUp v2.4.1** - Professional GitHub Automation & Security Platform  
 **License:** MIT  
 **Author:** Frederick Abraham
