@@ -48,13 +48,25 @@ def check_for_updates():
 
 def perform_update():
     """Executes a deep full-system update."""
-    print_info("Initiating Deep Update sequence...")
+    print_info("Initiating update sequence...")
     
     try:
-        current_file_path = os.path.abspath(__file__)
-        package_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file_path)))
+        # Determine package root more robustly
+        import pygitup
+        package_base = os.path.dirname(os.path.abspath(pygitup.__file__))
+        package_root = os.path.dirname(package_base)
         original_cwd = os.getcwd()
         
+        # Check if we are in a git repository
+        try:
+            # Use git to find the real top-level directory
+            root_check = subprocess.run(["git", "-C", package_root, "rev-parse", "--show-toplevel"], 
+                                      capture_output=True, text=True)
+            if root_check.returncode == 0:
+                package_root = root_check.stdout.strip()
+        except Exception:
+            pass
+
         if os.path.exists(os.path.join(package_root, ".git")):
             print_info(f"Synchronizing source at: {package_root}")
             os.chdir(package_root)
@@ -69,15 +81,15 @@ def perform_update():
                 print_info("Updating system environment...")
                 subprocess.run([sys.executable, "-m", "pip", "install", "-e", "."], capture_output=True)
                 
-                print_success("PyGitUp v2.0.1 is now installed!")
-                print_info("Please restart the tool to enter God Mode.")
+                print_success("PyGitUp successfully updated!")
+                print_info("Please restart the tool to apply changes.")
                 os.chdir(original_cwd)
                 sys.exit(0)
             else:
-                print_error(f"Sync Failed: {result.stderr}")
+                print_error(f"Sync Failed: {result.stderr.strip()}")
         else:
-            print_error("This installation is not managed by Git. Update manually via 'pip install --upgrade .'")
+            print_error("Installation is not a Git repository. Update via 'pip install --upgrade .'")
             
         os.chdir(original_cwd)
     except Exception as e:
-        print_error(f"Update sequence failed: {e}")
+        print_error(f"Update failed: {e}")

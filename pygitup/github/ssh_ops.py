@@ -10,7 +10,7 @@ def setup_ssh_infrastructure(config, github_token):
     Complete automation of SSH Key setup:
     1. Generate Key -> 2. Start Agent -> 3. Upload to GitHub -> 4. Test Connection -> 5. Update Remote
     """
-    print_header("SSH Key Infrastructure Manager")
+    print_header("SSH Key Configuration Manager")
     
     email = config["github"].get("email") or input("Enter email for SSH Key label: ")
     

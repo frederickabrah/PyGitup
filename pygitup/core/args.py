@@ -18,7 +18,7 @@ Examples:
     
     parser.add_argument(
         "--mode", 
-        choices=["project", "file", "batch", "template", "release", "multi-repo", "scan-todos", "offline-queue", "process-queue", "request-review", "smart-push", "generate-docs", "analytics", "configure", "branch", "stash", "tag", "cherry-pick", "gist", "webhook", "actions", "pr", "audit", "visibility", "repo-info", "delete-repo", "bulk-mgmt", "migrate", "fork-intel", "ai-commit", "ai-diagnostic", "ssh-setup", "tui"],
+        choices=["project", "file", "batch", "template", "release", "multi-repo", "scan-todos", "offline-queue", "process-queue", "request-review", "smart-push", "generate-docs", "analytics", "configure", "branch", "stash", "tag", "cherry-pick", "gist", "webhook", "actions", "pr", "audit", "visibility", "repo-info", "delete-repo", "bulk-mgmt", "migrate", "fork-intel", "ai-commit", "ai-diagnostic", "ssh-setup", "tui", "rotate-token"],
         help="Operation mode"
     )
 

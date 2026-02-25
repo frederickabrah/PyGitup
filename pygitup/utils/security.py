@@ -2,6 +2,7 @@ import os
 import ast
 import fnmatch
 import subprocess
+import re
 from ..github.api import get_dependabot_alerts, get_secret_scanning_alerts
 from ..utils.ui import print_success, print_error, print_warning, print_info, print_header, Table, box, console
 
@@ -64,23 +65,37 @@ class SASTVisitor(ast.NodeVisitor):
         self.vulnerabilities = []
 
     def visit_Call(self, node):
-        # 1. Command Injection (subprocess, os.system)
+        # 1. Command Injection (subprocess, os.system, os.popen, etc.)
         if isinstance(node.func, ast.Attribute):
-            if node.func.attr == 'system' and isinstance(node.func.value, ast.Name) and node.func.value.id == 'os':
-                self.vulnerabilities.append({
-                    "line": node.lineno,
-                    "type": "Command Injection",
-                    "code": "os.system(...)"
-                })
-            elif node.func.attr in ['run', 'call', 'Popen'] and isinstance(node.func.value, ast.Name) and node.func.value.id == 'subprocess':
-                # Check for shell=True
-                for keyword in node.keywords:
-                    if keyword.arg == 'shell' and isinstance(keyword.value, ast.Constant) and keyword.value.value is True:
-                        self.vulnerabilities.append({
+            if isinstance(node.func.value, ast.Name):
+                module_id = node.func.value.id
+                if module_id == 'os':
+                    if node.func.attr in ['system', 'popen', 'popen2', 'popen3', 'popen4']:
+                         self.vulnerabilities.append({
                             "line": node.lineno,
                             "type": "Command Injection",
-                            "code": f"subprocess.{node.func.attr}(..., shell=True)"
+                            "code": f"os.{node.func.attr}(...)"
                         })
+                    elif node.func.attr.startswith('spawn'):
+                         self.vulnerabilities.append({
+                            "line": node.lineno,
+                            "type": "Command Injection",
+                            "code": f"os.{node.func.attr}(...)"
+                        })
+                elif module_id == 'subprocess':
+                    if node.func.attr in ['run', 'call', 'check_call', 'check_output', 'Popen', 'getoutput', 'getstatusoutput']:
+                        # Check for shell=True
+                        is_shell = False
+                        for keyword in node.keywords:
+                            if keyword.arg == 'shell' and isinstance(keyword.value, ast.Constant) and keyword.value.value is True:
+                                is_shell = True
+                        
+                        if is_shell:
+                            self.vulnerabilities.append({
+                                "line": node.lineno,
+                                "type": "Command Injection",
+                                "code": f"subprocess.{node.func.attr}(..., shell=True)"
+                            })
 
         # 2. Insecure Deserialization (pickle.load)
         if isinstance(node.func, ast.Attribute):
@@ -100,14 +115,23 @@ class SASTVisitor(ast.NodeVisitor):
                     "code": f"{node.func.id}(...)"
                 })
 
+        # 4. Insecure Randomness
+        if isinstance(node.func, ast.Attribute):
+            if node.func.attr in ['random', 'seed', 'choice', 'randint'] and isinstance(node.func.value, ast.Name) and node.func.value.id == 'random':
+                self.vulnerabilities.append({
+                    "line": node.lineno,
+                    "type": "Insecure Randomness",
+                    "code": f"random.{node.func.attr}(...)"
+                })
+
         self.generic_visit(node)
 
     def visit_Assign(self, node):
-        # 4. Hardcoded Secrets
+        # 5. Hardcoded Secrets
         for target in node.targets:
             if isinstance(target, ast.Name):
                 name = target.id.lower()
-                if any(x in name for x in ['password', 'secret', 'token', 'api_key', 'auth']):
+                if any(x in name for x in ['password', 'secret', 'token', 'api_key', 'auth', 'access_key', 'private_key']):
                     if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
                         val = node.value.value
                         # Filter: Ignore empty, short, or obvious placeholders
@@ -149,10 +173,10 @@ def run_local_sast_scan(directory):
                     pass # Skip unparsable files
     
     if vulnerabilities:
-        print_error(f"ALERT: {len(vulnerabilities)} CONFIRMED vulnerabilities found via AST Analysis!")
+        print_error(f"ALERT: {len(vulnerabilities)} potential vulnerabilities found via AST Analysis.")
         table = Table(title="AST Security Findings", box=box.ROUNDED)
         table.add_column("Location", style="cyan")
-        table.add_column("Threat", style="bold red")
+        table.add_column("Type", style="bold red")
         table.add_column("Snippet", style="dim")
         
         for v in vulnerabilities[:15]:
@@ -160,12 +184,12 @@ def run_local_sast_scan(directory):
         console.print(table)
         return vulnerabilities
     
-    print_success("Local AST scan passed. No structural vulnerabilities detected.")
+    print_success("Local AST scan complete. No structural issues detected.")
     return []
 
 def run_audit(github_username=None, repo_name=None, github_token=None):
     """Run a comprehensive security audit (Local AST + Remote Scan)."""
-    print_header("Global Security Intelligence Audit")
+    print_header("Security Audit")
     
     # 1. Local SAST
     run_local_sast_scan(".")
@@ -214,7 +238,6 @@ def run_advanced_security_scan(username, repo_name, token):
 def check_is_sensitive(file_path):
     """Checks if a file path matches any sensitive patterns."""
     name = os.path.basename(file_path)
-    # ... (Keep existing simple pattern matching for files)
     gitignore_patterns = []
     if os.path.exists(".gitignore"):
         with open(".gitignore", "r") as f:
@@ -227,7 +250,7 @@ def check_is_sensitive(file_path):
     return False
 
 def audit_files_and_prompt(files):
-    """Scans a list of files for sensitive content."""
+    """Scans a list of files for sensitive content. Returns None on abort."""
     sensitive_matches = [f for f in files if check_is_sensitive(f)]
     if not sensitive_matches:
         return files
@@ -242,10 +265,9 @@ def audit_files_and_prompt(files):
         return [f for f in files if f not in sensitive_matches]
     elif choice == "2":
         return files
-    return []
+    return None # Return None to signify total abort
 
 def scan_directory_for_sensitive_files(directory):
-    # ... (Keep existing implementation)
     detected = []
     for root, dirs, files in os.walk(directory):
         for name in dirs + files:
@@ -261,7 +283,7 @@ def scan_directory_for_sensitive_files(directory):
     
     if choice == "1":
         with open(".gitignore", "a") as f:
-            f.write("\n# Added by PyGitUp Interceptor\n")
+            f.write("\n# Added by PyGitUp\n")
             for item in detected:
                 f.write(f"{os.path.relpath(item, directory)}\n")
         return True

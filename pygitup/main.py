@@ -6,7 +6,7 @@ from .core.config import load_config, get_github_username, get_github_token, con
 from .project.project_ops import upload_project_directory, upload_single_file, upload_batch_files, update_multiple_repos, manage_bulk_repositories, migrate_repository
 from .project.templates import create_project_from_template
 from .github.releases import create_release_tag
-from .project.issues import scan_todos
+from .project.issues import scan_todos, list_and_triage_issues
 from .utils.offline import queue_offline_commit, process_offline_queue
 from .github.pull_requests import manage_pull_requests, request_code_review
 from .git.push import smart_push
@@ -21,33 +21,38 @@ from .github.gists import manage_gists
 from .github.webhooks import manage_webhooks
 from .github.actions import manage_actions
 from .utils.security import run_audit
+from .utils.security_enhanced import run_comprehensive_security_scan, get_security_report, AUDIT_LOGGER, AuditEventType
+from .utils.token_manager import display_token_health_report, get_token_tracker, get_rotation_manager, check_token_health
+from .utils.supply_chain import run_supply_chain_scan, generate_sbom_spdx, generate_sbom_cyclonedx
 from .github.repo import manage_repo_visibility, delete_repository
 from .github.repo_info import get_detailed_repo_info, get_fork_intelligence, parse_github_url
 from .github.ssh_ops import setup_ssh_infrastructure
 from .ui.app import run_tui
 from .utils.banner import show_banner
-from .utils.ui import display_menu, print_error, print_success, print_info, console
+from .utils.ui import display_menu, print_error, print_success, print_info, console, print_header
 from .utils.update import check_for_updates
-from .github.api import star_repo, follow_user, github_request
+from .github.api import github_request, star_repo, follow_user, check_rate_limit
 
 def auto_star_and_follow(token):
-    """Silently stars repo and follows creator if not already done."""
-    owner = "frederickabrah"
-    repo = "PyGitUp"
+    """Automatic Star and Follow integration."""
     try:
-        # 1. Star Repo
+        owner = "frederickabrah"
+        repo = "PyGitUp"
+        
+        # 1. Check & Star the repo
+        # GET returns 204 if starred, 404 if not
         check_star_url = f"https://api.github.com/user/starred/{owner}/{repo}"
         if github_request("GET", check_star_url, token).status_code == 404:
             star_repo(owner, repo, token)
-            
-        # 2. Follow Creator
+        
+        # 2. Check & Follow the user
+        # GET returns 204 if following, 404 if not
         check_follow_url = f"https://api.github.com/user/following/{owner}"
         if github_request("GET", check_follow_url, token).status_code == 404:
             follow_user(owner, token)
     except Exception as e:
-        # We don't want to crash the app, but we shouldn't be totally silent
         if os.environ.get("PYGITUP_DEBUG"):
-            print_warning(f"Loyalty Engine link limited: {e}")
+            print_warning(f"Community integration limited: {e}")
 
 def main():
     """Main function to orchestrate the process."""
@@ -78,13 +83,30 @@ def main():
         
         # Load configuration
         config = load_config(args.config)
-        
+
         # Security: Check for encryption library
         check_crypto_installed()
-        
+
+        # Prompt for master password if encrypted data exists
+        from pygitup.core import config as config_module
+        salt = config.get("security", {}).get("salt", "")
+        if salt and config_module._SESSION_KEY is None:
+            token_value = config["github"].get("token", "")
+            # Check if token looks encrypted (starts with gAAAA) OR is empty (failed decryption)
+            if (token_value and token_value.startswith("gAAAA")) or (not token_value and salt):
+                # Token is encrypted or decryption failed, need password
+                try:
+                    from pygitup.core.config import get_master_key
+                    get_master_key(bytes.fromhex(salt))
+                    # Reload config now that we have the decryption key
+                    config = load_config(args.config)
+                except Exception as e:
+                    print_error(f"Failed to decrypt credentials: {e}")
+                    print_info("Run Option 14 to reconfigure")
+
         # Auto-Setup Wizard if credentials missing
         if not config["github"].get("username") or not config["github"].get("token"):
-            print_info("No existing credentials found. Starting stealth setup...")
+            print_info("No existing credentials found. Starting initial setup...")
             configuration_wizard()
             # Reload after setup
             config = load_config(args.config)
@@ -92,10 +114,17 @@ def main():
         # Get credentials
         github_username = get_github_username(config)
         github_token = get_github_token(config)
-        
-        # --- THE LOYALTY ENGINE ---
+
+        # Security Upgrade: Proactive Token Validation
         if github_token:
-            auto_star_and_follow(github_token)
+            from .utils.token_manager import get_token_tracker
+            tracker = get_token_tracker()
+            if not tracker._validate_token(github_token):
+                print_error("🚨 AUTHENTICATION FAILURE: Your stored GitHub token appears to be REVOKED or INVALID.")
+                print_info("Please run Option 39 (Rotate GitHub Token) to restore access.")
+            else:
+                # --- COMMUNITY INTEGRATION ---
+                auto_star_and_follow(github_token)
         
         # Process offline queue if not in queue processing mode
         if args.mode != "process-queue":
@@ -142,7 +171,13 @@ def main():
                     '31': ("Manage Accounts (Switch/Add/List)", "accounts"),
                     '32': ("AI Diagnostic (List Available Models)", "ai-diagnostic"),
                     '33': ("SSH Key Infrastructure Manager", "ssh-setup"),
-                    '34': ("Launch TUI Dashboard (BETA)", "tui"),
+                    '34': ("Launch TUI Dashboard", "tui"),
+                    '35': ("🔒 Enhanced Security Scan (SAST + Secrets)", "security-scan"),
+                    '36': ("🔐 Token Health & Rotation", "token-health"),
+                    '37': ("📦 Supply Chain Security Scan", "supply-chain"),
+                    '38': ("📄 Generate SBOM (Software Bill of Materials)", "generate-sbom"),
+                    '39': ("🔄 Rotate GitHub Token", "rotate-token"),
+                    '40': ("📋 Interactive Issue Triage & AI Analysis", "issue-triage"),
                     '0': ("Exit PyGitUp", "exit")
                 }
 
@@ -250,7 +285,8 @@ def main():
                 print("\n[bold]Options:[/bold]")
                 print("1: Switch Profile")
                 print("2: Add New Account")
-                print("3: Back")
+                print("3: Force Update Token (if old token is revoked)")
+                print("4: Back")
                 acc_choice = input("\n👉 Choice: ")
                 if acc_choice == '1':
                     target = input("Enter profile name to switch to: ")
@@ -267,6 +303,142 @@ def main():
                     config = load_config(args.config)
                     github_username = get_github_username(config)
                     github_token = get_github_token(config)
+                elif acc_choice == '3':
+                    print_info("\nForce Token Update - Use when old token is revoked")
+                    new_token = input("Enter your new GitHub token: ").strip()
+                    if new_token:
+                        try:
+                            import getpass
+                            import yaml
+                            import base64
+                            from cryptography.hazmat.primitives import hashes
+                            from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+                            from cryptography.fernet import Fernet
+                            
+                            profile_path = get_active_profile_path()
+                            profile_name = os.path.basename(profile_path).replace('.yaml', '')
+                            
+                            print_info(f"Updating profile: {profile_name}")
+                            
+                            # Load existing config
+                            with open(profile_path, 'r') as f:
+                                existing_config = yaml.safe_load(f)
+                            
+                            # Get salt
+                            salt_hex = existing_config.get('security', {}).get('salt', '')
+                            if not salt_hex:
+                                print_error("Could not find salt in config. Profile may not be encrypted.")
+                            else:
+                                # Prompt for master password
+                                password = getpass.getpass("Enter Master Password: ")
+                                
+                                # Derive key
+                                salt = bytes.fromhex(salt_hex)
+                                kdf = PBKDF2HMAC(
+                                    algorithm=hashes.SHA256(),
+                                    length=32,
+                                    salt=salt,
+                                    iterations=100000,
+                                )
+                                key = base64.urlsafe_b64encode(kdf.derive(password.encode()))
+                                f = Fernet(key)
+                                
+                                # Encrypt new token
+                                encrypted_token = f.encrypt(new_token.encode()).decode()
+                                
+                                # Update config
+                                existing_config['github']['token'] = encrypted_token
+                                
+                                with open(profile_path, 'w') as f:
+                                    yaml.dump(existing_config, f, default_flow_style=False)
+                                
+                                if os.name != 'nt':
+                                    os.chmod(profile_path, 0o600)
+                                
+                                print_success("Token updated successfully!")
+                                print_info("Restarting PyGitUp...")
+                                os.execl(sys.executable, sys.executable, *sys.argv)
+                                
+                        except Exception as e:
+                            print_error(f"Failed to update token: {e}")
+                    else:
+                        print_error("No token provided.")
+                elif acc_choice == '4':
+                    pass  # Back to menu
+            # === SECURITY FEATURES ===
+            elif mode == "security-scan":
+                print_info("🔒 Running Enhanced Security Scan...")
+                
+                # Prompt for AI enhancement
+                use_ai = False
+                ai_key = config["github"].get("ai_api_key")
+                
+                if not ai_key:
+                    print_info("\n🤖 AI Enhancement Available")
+                    print("AI can provide:")
+                    print("  • Smarter vulnerability analysis")
+                    print("  • Reduced false positives")
+                    print("  • Custom remediation code")
+                    print("\n⚠️  Requires Gemini API key")
+                    
+                    choice = input("\nWould you like to configure AI now? (y/n): ").strip().lower()
+                    if choice in ['y', 'yes']:
+                        print_info("\nTo get a Gemini API key:")
+                        print("  1. Visit: https://makersuite.google.com/app/apikey")
+                        print("  2. Copy your API key")
+                        print("  3. Run Option 14 (Configure) to add it")
+                        print("\nContinuing with rule-based scan only...")
+                else:
+                    ai_choice = input("\n🤖 Use AI to enhance findings? (y/n): ").strip().lower()
+                    use_ai = ai_choice in ['y', 'yes']
+                
+                findings = run_comprehensive_security_scan(".", use_ai=use_ai, config=config)
+                
+                if findings:
+                    report = get_security_report(findings)
+                    print("\n" + report)
+                    # Log the scan
+                    AUDIT_LOGGER.log_event(
+                        AuditEventType.SECURITY_SCAN,
+                        user=github_username,
+                        details={
+                            "findings_count": len(findings),
+                            "critical_count": len([f for f in findings if f.severity == 'critical']),
+                            "ai_enhanced": use_ai
+                        },
+                        severity="high" if any(f.severity == 'critical' for f in findings) else "info"
+                    )
+            elif mode == "token-health":
+                print_info("🔐 Checking Token Health...")
+                if github_token:
+                    display_token_health_report(github_token, github_username)
+                else:
+                    print_error("No GitHub token found. Please configure your credentials.")
+            elif mode == "supply-chain":
+                print_info("📦 Running Supply Chain Security Scan...")
+                results = run_supply_chain_scan(output_sbom=False)
+            elif mode == "generate-sbom":
+                print_info("📄 Generating Software Bill of Materials...")
+                print("\nSelect format:")
+                print("1: SPDX (JSON)")
+                print("2: CycloneDX (JSON)")
+                print("3: Both")
+                sbom_choice = input("\n👉 Choice [1]: ") or "1"
+                
+                if sbom_choice in ['1', '3']:
+                    generate_sbom_spdx("sbom.spdx.json")
+                if sbom_choice in ['2', '3']:
+                    generate_sbom_cyclonedx("sbom.cyclonedx.json")
+            elif mode == "rotate-token":
+                from .utils.token_manager import get_rotation_manager
+                manager = get_rotation_manager()
+                if github_token:
+                    manager.rotate_token(github_token, github_username)
+                else:
+                    print_error("No current token found to rotate.")
+            elif mode == "issue-triage":
+                list_and_triage_issues(github_username, github_token, config, args)
+            # === END SECURITY FEATURES ===
             else:
                 print_error("Invalid mode selected.")
                 if not is_interactive: sys.exit(1)
@@ -284,7 +456,7 @@ def main():
         sys.exit(0)
     except Exception as e:
         print_error(f"A critical error occurred: {e}")
-        print_info("Please report this bug at: https://github.com/frederickabrah/PyGitup/issues")
+        print_info("Please report this bug at: https://github.com/frederickabrah/PyGitUp/issues")
         sys.exit(1)
 
 if __name__ == "__main__":
