@@ -501,28 +501,81 @@ def scan_dependencies_osv(packages: Dict[str, str]) -> List[DependencyVulnerabil
 # SBOM GENERATION
 # =============================================================================
 
-def generate_sbom_spdx(output_file: str = "sbom.spdx.json") -> str:
+def get_project_info(directory="."):
+    """Get project name and version from the current directory."""
+    import re
+    
+    # Try to get from setup.py
+    setup_path = os.path.join(directory, "setup.py")
+    if os.path.exists(setup_path):
+        try:
+            with open(setup_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                name_match = re.search(r"name=['\"]([^'\"]+)['\"]", content)
+                version_match = re.search(r"version=['\"]([^'\"]+)['\"]", content)
+                if name_match and version_match:
+                    return name_match.group(1), version_match.group(1)
+        except:
+            pass
+    
+    # Try to get from pyproject.toml
+    pyproject_path = os.path.join(directory, "pyproject.toml")
+    if os.path.exists(pyproject_path):
+        try:
+            import tomli
+            with open(pyproject_path, 'rb') as f:
+                data = tomli.load(f)
+                name = data.get('project', {}).get('name', '')
+                version = data.get('project', {}).get('version', '0.0.0')
+                if name:
+                    return name, version
+        except:
+            pass
+    
+    # Fallback to directory name
+    dir_name = os.path.basename(os.path.abspath(directory))
+    return dir_name, "0.0.0"
+
+
+def generate_sbom_spdx(output_file: str = "sbom.spdx.json", directory: str = ".") -> str:
     """
     Generate a Software Bill of Materials in SPDX format.
-    
+
     Args:
         output_file: Output file path
-        
+        directory: Project directory to scan
+
     Returns:
         Path to generated SBOM
     """
     print_info("📦 Generating Software Bill of Materials (SBOM)...")
     
-    packages = get_installed_packages()
-    requirements = parse_requirements_file()
+    # Get actual project info
+    project_name, project_version = get_project_info(directory)
+    print_info(f"   Project: {project_name} v{project_version}")
+
+    # Parse requirements from the project directory
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(directory)
+        requirements = parse_requirements_file()
+        packages = get_installed_packages()
+        
+        # Filter to only packages in requirements
+        if requirements:
+            filtered_packages = {k: v for k, v in packages.items() if k in requirements}
+            if filtered_packages:
+                packages = filtered_packages
+                print_info(f"   Found {len(packages)} dependencies from requirements")
+    finally:
+        os.chdir(old_cwd)
     
     # SPDX document structure
     spdx_doc = {
         "spdxVersion": "SPDX-2.3",
         "dataLicense": "CC0-1.0",
         "SPDXID": "SPDXRef-DOCUMENT",
-        "name": f"PyGitUp-SBOM-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
-        # Use URN format (not a real URL) - SPDX compliant unique identifier
+        "name": f"{project_name}-SBOM-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
         "documentNamespace": f"urn:uuid:{hashlib.sha256(os.urandom(16)).hexdigest()}",
         "creationInfo": {
             "created": datetime.utcnow().isoformat() + "Z",
@@ -532,17 +585,17 @@ def generate_sbom_spdx(output_file: str = "sbom.spdx.json") -> str:
         "packages": [],
         "relationships": []
     }
-    
-    # Add root package
+
+    # Add root package - use actual project info
     spdx_doc["packages"].append({
-        "SPDXID": "SPDXRef-Package-PyGitUp",
-        "name": "PyGitUp",
-        "version": "2.3.0",
-        "downloadLocation": "https://github.com/frederickabrah/PyGitUp",
+        "SPDXID": "SPDXRef-Package-Root",
+        "name": project_name,
+        "version": project_version,
+        "downloadLocation": "NOASSERTION",
         "filesAnalyzed": False,
         "licenseConcluded": "NOASSERTION",
-        "licenseDeclared": "MIT",
-        "copyrightText": "Copyright (c) Frederick Abraham"
+        "licenseDeclared": "NOASSERTION",
+        "copyrightText": "NOASSERTION"
     })
     
     # Add dependencies
@@ -562,7 +615,7 @@ def generate_sbom_spdx(output_file: str = "sbom.spdx.json") -> str:
         
         # Add relationship
         spdx_doc["relationships"].append({
-            "spdxElementId": "SPDXRef-Package-PyGitUp",
+            "spdxElementId": "SPDXRef-Package-Root",
             "relatedSpdxElement": pkg_id,
             "relationshipType": "DEPENDS_ON"
         })
@@ -581,19 +634,37 @@ def generate_sbom_spdx(output_file: str = "sbom.spdx.json") -> str:
         return ""
 
 
-def generate_sbom_cyclonedx(output_file: str = "sbom.cyclonedx.json") -> str:
+def generate_sbom_cyclonedx(output_file: str = "sbom.cyclonedx.json", directory: str = ".") -> str:
     """
     Generate a Software Bill of Materials in CycloneDX format.
-    
+
     Args:
         output_file: Output file path
-        
+        directory: Project directory to scan
+
     Returns:
         Path to generated SBOM
     """
     print_info("📦 Generating CycloneDX SBOM...")
     
-    packages = get_installed_packages()
+    # Get actual project info
+    project_name, project_version = get_project_info(directory)
+    print_info(f"   Project: {project_name} v{project_version}")
+    
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(directory)
+        packages = get_installed_packages()
+        requirements = parse_requirements_file()
+        
+        # Filter to only packages in requirements
+        if requirements:
+            filtered_packages = {k: v for k, v in packages.items() if k in requirements}
+            if filtered_packages:
+                packages = filtered_packages
+                print_info(f"   Found {len(packages)} dependencies from requirements")
+    finally:
+        os.chdir(old_cwd)
     
     # CycloneDX document structure
     cyclonedx_doc = {
@@ -607,14 +678,14 @@ def generate_sbom_cyclonedx(output_file: str = "sbom.cyclonedx.json") -> str:
                 {
                     "vendor": "PyGitUp",
                     "name": "PyGitUp",
-                    "version": "2.3.0"
+                    "version": "2.4.2"
                 }
             ],
             "component": {
                 "type": "application",
-                "name": "PyGitUp",
-                "version": "2.3.0",
-                "purl": f"pkg:pypi/pygitup@2.3.0"
+                "name": project_name,
+                "version": project_version,
+                "purl": f"pkg:pypi/{project_name.lower()}@{project_version}"
             }
         },
         "components": [],
