@@ -105,35 +105,46 @@ def undo_last_commit():
     """Unstages the last commit while keeping all changes in the working directory."""
     print_header("Atomic Undo: Last Commit")
     
+    # Check for dry-run mode
+    import sys
+    if '--dry-run' in sys.argv:
+        print_info("*** DRY RUN MODE - No changes will be made ***")
+        print_info("Would undo the last commit")
+        result = subprocess.run(["git", "log", "-1", "--oneline"], capture_output=True, text=True)
+        if result.stdout:
+            print_info(f"Commit to undo: {result.stdout.strip()}")
+        print_info("Your changes would remain staged")
+        return True
+    
     try:
         # Check if git is installed
         if not check_git_installed():
             print_error("Git is not installed or not in PATH")
             return False
-        
+
         # Check repo state
         warnings, branch = check_repo_state()
         print_info(f"Current branch: {branch}")
-        
+
         for w in warnings:
             print_warning(w)
-        
+
         # Check if we have any commits
         res = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True)
         if res.returncode != 0:
             print_error("No commits found in this repository.")
             return False
-        
+
         # Show what will be undone
         res = subprocess.run(["git", "log", "-1", "--oneline"], capture_output=True, text=True)
         if res.stdout:
             print_info(f"Will undo: {res.stdout.strip()}")
-        
+
         confirm = input("\nProceed with undo? (yes/NO): ").strip().lower()
         if confirm != 'yes':
             print_info("Operation cancelled.")
             return False
-        
+
         print_info("Performing soft reset to HEAD~1...")
         subprocess.run(["git", "reset", "--soft", "HEAD~1"], check=True)
 
@@ -152,6 +163,36 @@ def undo_last_commit():
 def purge_file_from_history(file_path):
     """Removes a file from every commit in the repository history."""
     print_header(f"Deep Purge: {file_path}")
+    
+    # Check for dry-run mode
+    import sys
+    if '--dry-run' in sys.argv:
+        print_info("*** DRY RUN MODE - No changes will be made ***")
+        print_warning("CRITICAL: This would rewrite your entire repository history!")
+        print_info("All other contributors would need to re-clone or rebase")
+        
+        # Check if file exists in history
+        res = subprocess.run(["git", "log", "--all", "--full-history", "--", file_path], 
+                           capture_output=True, text=True)
+        if not res.stdout.strip():
+            print_error(f"File '{file_path}' not found in repository history.")
+            return False
+        
+        # Show commits containing the file
+        res = subprocess.run(["git", "log", "--oneline", "--", file_path], 
+                           capture_output=True, text=True)
+        if res.stdout:
+            commit_count = len(res.stdout.strip().split('\n'))
+            print_info(f"File found in {commit_count} commits:")
+            for line in res.stdout.strip().split('\n')[:5]:
+                print(f"  {line}")
+            if commit_count > 5:
+                print(f"  ... and {commit_count - 5} more")
+        
+        print_info("\nWould purge this file from ALL commits")
+        print_info("Would create backup branch before proceeding")
+        return True
+    
     print_warning("CRITICAL: This will rewrite your entire repository history!")
     print_warning("All other contributors will need to re-clone or rebase.")
     

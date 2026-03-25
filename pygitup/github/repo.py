@@ -71,12 +71,21 @@ def delete_repository(args, github_username, github_token):
     if not repo_name:
         print_error("Repository name is required.")
         return
+    
+    # Check for dry-run mode
+    import sys
+    if '--dry-run' in sys.argv:
+        print_info("*** DRY RUN MODE - No changes will be made ***")
+        print_error(f"Would PERMANENTLY DELETE: {repo_name}")
+        print_info("This action CANNOT be undone")
+        print_info("All code, issues, PRs, and wiki would be lost")
+        return
 
     # Professional Danger Warning
     from rich.panel import Panel
     from rich.text import Text
     from ..utils.ui import console
-    
+
     warning_text = Text.assemble(
         ("DANGER: ", "bold red"),
         (f"You are about to PERMANENTLY DELETE repository '", "white"),
@@ -85,14 +94,14 @@ def delete_repository(args, github_username, github_token):
     )
     console.print(Panel(warning_text, border_style="red", title="⚠️  CRITICAL ACTION"))
     print_warning("This operation is irreversible and will remove all code, issues, and history.")
-    
+
     print("\nStep 1: Security Verification")
     confirm_name = input(f"Type the repository name to confirm ('{repo_name}'): ").strip()
-    
+
     if confirm_name != repo_name:
         print_info("Verification failed. Deletion cancelled.")
         return
-    
+
     print("\nStep 2: Final Authorization")
     final = input("Type 'CONFIRM DELETE' to finalize: ").strip()
     if final != 'CONFIRM DELETE':
