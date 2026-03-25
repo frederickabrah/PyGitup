@@ -33,6 +33,76 @@ from .utils.ui import display_menu, print_error, print_success, print_info, cons
 from .utils.update import check_for_updates
 from .github.api import github_request, star_repo, follow_user, check_rate_limit
 
+# =============================================================================
+# INLINE HELP SYSTEM
+# =============================================================================
+
+HELP_TEXTS = {
+    # Core Operations (1-4)
+    "project": "Upload entire project directory to GitHub. Initializes git repo, creates GitHub repo, and pushes all files.",
+    "file": "Upload a single file to an existing GitHub repository.",
+    "batch": "Upload multiple files to GitHub in one operation.",
+    "template": "Create a new project from a template (React, Django, Rust, etc.).",
+    
+    # GitHub Operations (5-9, 19-22, 24-29)
+    "release": "Create a new GitHub release with version tag and changelog.",
+    "multi-repo": "Update the same file across multiple repositories.",
+    "scan-todos": "Scan codebase for TODO/FIXME comments and create GitHub issues.",
+    "offline-queue": "Queue commits for later upload when offline.",
+    "process-queue": "Process and upload queued offline commits.",
+    "request-review": "Request code review on a pull request.",
+    "smart-push": "Intelligently squash meaningless commits before pushing.",
+    "generate-docs": "Auto-generate documentation from code.",
+    "analytics": "Generate collaboration and repository analytics.",
+    "branch": "Manage Git branches (list, create, delete, switch).",
+    "stash": "Manage Git stashes (save, list, apply, pop).",
+    "tag": "Manage Git tags (list, create, delete).",
+    "cherry-pick": "Apply a specific commit from another branch.",
+    "gist": "Create and manage GitHub Gists.",
+    "webhook": "Manage repository webhooks.",
+    "actions": "Manage GitHub Actions workflows.",
+    "pr": "Manage Pull Requests (list, create, merge).",
+    "visibility": "Change repository visibility (public/private).",
+    "repo-info": "Get detailed information about a GitHub repository.",
+    "delete-repo": "Delete a GitHub repository (IRREVERSIBLE!).",
+    "bulk-mgmt": "View and manage all your repositories with health scores.",
+    "migrate": "Migrate/mirror a repository from GitLab, Bitbucket, etc.",
+    "fork-intel": "Analyze fork network and community contributions.",
+    
+    # AI Features (30-32, 40)
+    "ai-commit": "Generate semantic commit messages using AI.",
+    "ai-diagnostic": "List available AI models for code assistance.",
+    "ssh-setup": "Generate and upload SSH keys for authentication.",
+    "issue-triage": "AI-powered issue analysis and prioritization.",
+    
+    # Security Features (23, 35-39, 41-45)
+    "audit": "Run comprehensive security audit (local + GitHub).",
+    "security-scan": "Enhanced SAST scan with 60+ secret patterns.",
+    "token-health": "Check GitHub token health and expiration.",
+    "supply-chain": "Scan dependencies for vulnerabilities.",
+    "generate-sbom": "Generate Software Bill of Materials (SPDX/CycloneDX).",
+    "rotate-token": "Rotate GitHub token securely.",
+    "undo-commit": "Undo last commit while preserving changes.",
+    "purge-file": "Remove a file from entire git history.",
+    "purge-string": "Remove sensitive string from git history.",
+    "edit-history": "Interactive commit history editor.",
+    "remediation-help": "Show help for remediation operations.",
+    
+    # Tools & Misc (14, 31, 33-34)
+    "configure": "Configure PyGitUp credentials and settings.",
+    "accounts": "Manage multiple GitHub accounts/profiles.",
+    "tui": "Launch the Text User Interface dashboard.",
+}
+
+def show_help_for_mode(mode):
+    """Show detailed help for a specific mode."""
+    if mode in HELP_TEXTS:
+        print_header(f"Help: {mode.replace('-', ' ').title()}")
+        print_info(HELP_TEXTS[mode])
+        print("\n💡 Tip: Use --help flag with CLI commands for more details.")
+    else:
+        print_warning(f"No help available for: {mode}")
+
 def auto_star_and_follow(token):
     """Automatic Star and Follow integration."""
     try:
@@ -188,6 +258,7 @@ def main():
                     '43': ("✂️  Purge Sensitive String from History", "purge-string"),
                     '44': ("📝 Interactive History Editor (Edit/Delete Commits)", "edit-history"),
                     '45': ("📖 Remediation Help & Guide", "remediation-help"),
+                    'H': ("❓ Show Help for Feature", "help"),
                     '0': ("Exit PyGitUp", "exit")
                 }
 
@@ -469,6 +540,41 @@ def main():
             elif mode == "remediation-help":
                 from .utils.remediation import show_remediation_help
                 show_remediation_help()
+            elif mode == "help":
+                # Show help for a specific feature
+                print_header("Feature Help")
+                print("Enter the feature number or name to get help (or 'list' to see all):")
+                help_choice = input("\n👉 Choice: ").strip().lower()
+                
+                if help_choice == "list":
+                    print("\nAvailable Features:")
+                    for mode_name, description in sorted(HELP_TEXTS.items()):
+                        print(f"  • {mode_name}: {description[:60]}...")
+                elif help_choice in HELP_TEXTS:
+                    show_help_for_mode(help_choice)
+                else:
+                    # Try to match by menu number
+                    menu_map = {
+                        '1': 'project', '2': 'file', '3': 'batch', '4': 'template',
+                        '5': 'release', '6': 'multi-repo', '7': 'scan-todos',
+                        '8': 'offline-queue', '9': 'process-queue', '10': 'request-review',
+                        '11': 'smart-push', '12': 'generate-docs', '13': 'analytics',
+                        '14': 'configure', '15': 'branch', '16': 'stash', '17': 'tag',
+                        '18': 'cherry-pick', '19': 'gist', '20': 'webhook', '21': 'actions',
+                        '22': 'pr', '23': 'audit', '24': 'visibility', '25': 'repo-info',
+                        '26': 'delete-repo', '27': 'bulk-mgmt', '28': 'migrate',
+                        '29': 'fork-intel', '30': 'ai-commit', '31': 'accounts',
+                        '32': 'ai-diagnostic', '33': 'ssh-setup', '34': 'tui',
+                        '35': 'security-scan', '36': 'token-health', '37': 'supply-chain',
+                        '38': 'generate-sbom', '39': 'rotate-token', '40': 'issue-triage',
+                        '41': 'undo-commit', '42': 'purge-file', '43': 'purge-string',
+                        '44': 'edit-history', '45': 'remediation-help'
+                    }
+                    if help_choice in menu_map:
+                        show_help_for_mode(menu_map[help_choice])
+                    else:
+                        print_warning(f"Unknown feature: {help_choice}")
+                        print("Type 'list' to see all available features.")
             # === END SECURITY FEATURES ===
             else:
                 print_error("Invalid mode selected.")
