@@ -460,16 +460,31 @@ they are installed on your system, providing elite performance:
 def interactive_commit_manager():
     """Industrial UI for managing recent commits with Context and Ghost Editing."""
     print_header("Interactive History Manager")
-    
+
     current_dir = os.getcwd()
     console.print(f"\n[cyan]Current Context:[/cyan] {current_dir}")
+
+    # Check for uncommitted changes BEFORE proceeding
+    res = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
+    if res.stdout.strip():
+        print_warning("⚠️  You have uncommitted changes!")
+        print_warning("These changes may be lost during history editing.")
+        print_info("Recommended actions:")
+        print("  1. Commit changes: git add . && git commit -m 'WIP'")
+        print("  2. Stash changes: git stash")
+        print("  3. Discard changes: git checkout -- .")
+        choice = input("\nProceed anyway? (y/n): ").strip().lower()
+        if choice != 'y':
+            print_info("Operation cancelled. Please save or stash your changes first.")
+            return
+
     console.print("\n[bold]Select Context:[/bold]")
     console.print("  [1] Manage Current Directory")
     console.print("  [2] Manage Other Local Repository (Path)")
     console.print("  [3] Ghost Edit Remote Repository (GitHub Name)")
-    
+
     choice = input("\n👉 Choice [1]: ") or "1"
-    
+
     temp_mode = False
     temp_dir = ""
 
@@ -482,27 +497,69 @@ def interactive_commit_manager():
             print_error(f"Invalid directory: {target_path}")
             return
     elif choice == '3':
+        # FIX BUG #5: Add repository name validation
+        import re
         repo_name = input("Enter GitHub repository (e.g., user/repo): ").strip()
-        if not repo_name: return
+        if not repo_name:
+            print_error("Repository name required")
+            return
         
+        # Validate format: user/repo
+        if not re.match(r'^[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+$', repo_name):
+            print_error("Invalid repository format. Use: user/repo")
+            return
+        
+        # FIX BUG #6: Make clone depth configurable
+        print_info("How many commits to fetch? (default: 100, 0 for full history)")
+        try:
+            depth = int(input("👉 Depth [100]: ") or "100")
+            if depth <= 0:
+                depth = None  # Full history
+        except ValueError:
+            depth = 100
+
         # Ghost Editing Logic
         import tempfile
         temp_dir = tempfile.mkdtemp(prefix="pygitup_ghost_")
         temp_mode = True
-        
+
         from ..core.config import load_config, get_github_token
         config = load_config()
         token = get_github_token(config)
-        
+
         print_info(f"Initiating Ghost Clone into {temp_dir}...")
         try:
-            # Clone using token for auth
-            clone_url = f"https://{token}@github.com/{repo_name}.git"
-            subprocess.run(["git", "clone", "--depth", "50", clone_url, temp_dir], check=True, capture_output=True)
+            # FIX BUG #2: Use credential helper instead of exposing token in URL
+            # Write token to a temporary credential helper script
+            import stat
+            
+            # Create a temporary credential helper
+            helper_script = os.path.join(temp_dir, ".git_helper.sh")
+            with open(helper_script, 'w') as f:
+                f.write(f"#!/bin/bash\necho '{token}'\n")
+            os.chmod(helper_script, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)  # 700 permissions
+            
+            # Configure git to use the helper
+            env = os.environ.copy()
+            env['GIT_ASKPASS'] = helper_script
+            
+            # Clone using the credential helper (token not visible in ps)
+            clone_url = f"https://github.com/{repo_name}.git"
+            clone_cmd = ["git", "clone"]
+            if depth:
+                clone_cmd.extend(["--depth", str(depth)])
+            clone_cmd.extend([clone_url, temp_dir])
+            
+            subprocess.run(clone_cmd, check=True, capture_output=True, env=env)
+            
+            # Clean up helper script
+            os.remove(helper_script)
+            
             os.chdir(temp_dir)
             print_success("Ghost Context Active.")
         except Exception as e:
             print_error(f"Ghost Clone failed: {e}")
+            # FIX BUG #4: Ensure cleanup even on clone failure
             shutil.rmtree(temp_dir, ignore_errors=True)
             return
 
@@ -584,33 +641,70 @@ def interactive_commit_manager():
             # Delete Commit logic
             console.print(f"\n[bold red]CRITICAL:[/bold red] This will remove commit {selected['hash']} permanently!")
             confirm = input("Confirm deletion? (y/n): ")
-            if confirm.lower() == 'y':
-                # 1. Create backup branch FIRST
-                create_backup()
+            if confirm.lower() != 'y':
+                print_info("Deletion cancelled.")
+                return
+            
+            # FIX BUG #1: Import create_backup from agent_tools
+            from .agent_tools import create_git_checkpoint
+            
+            # 1. Create backup FIRST
+            checkpoint_id = create_git_checkpoint(f"Before deleting {selected['hash']}")
+            if checkpoint_id:
+                print_success(f"Backup created: {checkpoint_id}")
+            else:
+                print_warning("Could not create backup. Proceed with extreme caution.")
 
-                # 2. Handle dirty worktree
-                res = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
-                stashed = False
-                if res.stdout.strip():
-                    print_info("Unstaged changes detected. Stashing for safety...")
-                    subprocess.run(["git", "stash", "push", "-m", "PyGitUp Remediation Auto-Stash"], check=True)
-                    stashed = True
+            # 2. Handle dirty worktree
+            res = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
+            stashed = False
+            if res.stdout.strip():
+                print_info("Unstaged changes detected. Stashing for safety...")
+                subprocess.run(["git", "stash", "push", "-m", "PyGitUp Remediation Auto-Stash"], check=True)
+                stashed = True
+
+            # 3. FIX BUG #3: Use safe rebase with sequence editor
+            print_info(f"Dropping commit {selected['hash']}...")
+            try:
+                # Create a safe rebase sequence editor script
+                import tempfile
+                import stat
                 
-                # 3. Use rebase to drop the commit
-                print_info(f"Dropping commit {selected['hash']}...")
+                # Create editor script that replaces 'pick' with 'drop' for our commit
+                editor_script = tempfile.mktemp(suffix='.sh')
+                with open(editor_script, 'w') as f:
+                    f.write(f"#!/bin/bash\n")
+                    f.write(f"# Auto-drop commit {selected['hash']}\n")
+                    f.write(f"sed -i.bak 's/^pick {selected['hash']}/drop {selected['hash']}/' \"$1\"\n")
+                
+                os.chmod(editor_script, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)  # 700 permissions
+                
+                # Run interactive rebase with our custom sequence editor
+                env = os.environ.copy()
+                env['GIT_SEQUENCE_EDITOR'] = editor_script
+                
+                # Start from the parent of the commit to delete
+                parent_commit = f"{selected['hash']}^"
+                subprocess.run(["git", "rebase", "-i", parent_commit], check=True, env=env)
+                
+                # Clean up editor script and backup
                 try:
-                    # Technical: rebase starting from parent, and skip the target commit
-                    subprocess.run(["git", "rebase", "--onto", f"{selected['hash']}^", selected['hash'], "HEAD"], check=True)
-                    print_success("Commit deleted from history.")
-                    print_info("Use 'git push --force' to update remote.")
-                except Exception as rebase_err:
-                    print_error(f"Rebase failed: {rebase_err}")
-                    print_info("Attempting to abort rebase...")
-                    subprocess.run(["git", "rebase", "--abort"], capture_output=True)
-                finally:
-                    if stashed:
-                        print_info("Restoring your stashed changes...")
-                        subprocess.run(["git", "stash", "pop"], capture_output=True)
+                    os.remove(editor_script)
+                    os.remove(editor_script + '.bak')
+                except:
+                    pass
+                
+                print_success("Commit deleted from history.")
+                print_info("Use 'git push --force-with-lease' to update remote.")
+                
+            except Exception as rebase_err:
+                print_error(f"Rebase failed: {rebase_err}")
+                print_info("Attempting to abort rebase...")
+                subprocess.run(["git", "rebase", "--abort"], capture_output=True)
+            finally:
+                if stashed:
+                    print_info("Restoring your stashed changes...")
+                    subprocess.run(["git", "stash", "pop"], capture_output=True)
 
     except Exception as e:
         print_error(f"History management failed: {e}")

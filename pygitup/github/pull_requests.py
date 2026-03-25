@@ -1,4 +1,4 @@
-import inquirer
+import questionary
 import subprocess
 import time
 
@@ -14,29 +14,20 @@ def manage_pull_requests(args, github_username, github_token):
 
     if not action:
         print_header("Pull Request Management")
-        questions = [
-            inquirer.List(
-                "action",
-                message="What pull request operation would you like to perform?",
-                choices=["merge", "close", "comment"],
-            )
-        ]
-        answers = inquirer.prompt(questions)
-        action = answers["action"]
+        action = questionary.select(
+            "What pull request operation would you like to perform?",
+            choices=["merge", "close", "comment"],
+        ).ask()
 
         if not repo_name:
-            repo_questions = [inquirer.Text("repo", message="Enter the repository name")]
-            repo_answers = inquirer.prompt(repo_questions)
-            repo_name = repo_answers["repo"]
+            repo_name = questionary.text("Enter the repository name").ask()
 
-        pr_number_questions = [inquirer.Text("pr_number", message="Enter the pull request number")]
-        pr_number_answers = inquirer.prompt(pr_number_questions)
-        pr_number = int(pr_number_answers["pr_number"])
+        pr_number = questionary.text("Enter the pull request number").ask()
+        if pr_number:
+            pr_number = int(pr_number)
 
         if action == "comment":
-            comment_questions = [inquirer.Text("comment", message="Enter your comment")]
-            comment_answers = inquirer.prompt(comment_questions)
-            comment = comment_answers["comment"]
+            comment = questionary.text("Enter your comment").ask()
 
     if not repo_name or not pr_number:
         print_error("Repository name and pull request number are required.")
@@ -78,7 +69,7 @@ def request_code_review(github_username, github_token, config, args=None):
     if args and args.repo:
         repo_name = args.repo
     else:
-        repo_name = inquirer.prompt([inquirer.Text("repo", message="Enter the repository name")])["repo"]
+        repo_name = questionary.text("Enter the repository name").ask()
 
     # TECHNICAL VALIDATION: Ensure current directory matches the target repo
     try:

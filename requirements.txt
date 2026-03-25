@@ -2,7 +2,7 @@ requests
 PyYAML
 tqdm
 pip-audit
-inquirer
+questionary
 rich
 beautifulsoup4
 pytest

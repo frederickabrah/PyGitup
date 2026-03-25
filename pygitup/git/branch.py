@@ -1,5 +1,5 @@
 import subprocess
-import inquirer
+import questionary
 from ..utils.ui import print_success, print_error, print_info, print_header
 
 def manage_branches(args):
@@ -9,28 +9,19 @@ def manage_branches(args):
 
     if not action:
         print_header("Branch Management")
-        questions = [
-            inquirer.List(
-                "action",
-                message="What branch operation would you like to perform?",
-                choices=["list", "create", "delete", "switch"],
-            )
-        ]
-        answers = inquirer.prompt(questions)
-        if not answers:
+        action = questionary.select(
+            "What branch operation would you like to perform?",
+            choices=["list", "create", "delete", "switch"],
+        ).ask()
+        if not action:
             print_info("Operation cancelled.")
             return
-        action = answers["action"]
 
         if action in ["create", "delete", "switch"]:
-            branch_questions = [
-                inquirer.Text("branch_name", message=f"Enter the name of the branch to {action}")
-            ]
-            branch_answers = inquirer.prompt(branch_questions)
-            if not branch_answers:
+            branch_name = questionary.text(f"Enter the name of the branch to {action}").ask()
+            if not branch_name:
                 print_info("Operation cancelled.")
                 return
-            branch_name = branch_answers["branch_name"]
 
     try:
         if action == "list":

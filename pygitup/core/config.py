@@ -222,7 +222,7 @@ def configuration_wizard(profile_name=None):
         console.print("  1: [red]Overwrite[/red] (Reset all credentials)")
         console.print("  2: [green]Fill Missing[/green] (Keep existing, add new ones)")
         console.print("  3: [white]Cancel[/white]")
-        
+
         choice = input("\n👉 Choice: ").strip()
         if choice == '3': return
         if choice == '2':
@@ -235,20 +235,34 @@ def configuration_wizard(profile_name=None):
                 existing_config = {}
 
     console.print(f"\n[cyan]Context: {profile_name}[/cyan] | Mode: {mode}\n")
-    
+
+    # Load existing config for display
+    existing_username = ""
+    existing_token_set = False
+    existing_ai_key_set = False
+    try:
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                existing_config_display = yaml.safe_load(f) or {}
+                existing_username = existing_config_display.get('github', {}).get('username', '')
+                existing_token_set = bool(existing_config_display.get('github', {}).get('token', ''))
+                existing_ai_key_set = bool(existing_config_display.get('github', {}).get('ai_api_key', ''))
+    except:
+        pass
+
     # 1. Set Master Password
     password = getpass.getpass("🔐 Set Master Password for this profile: ")
     confirm = getpass.getpass("🔐 Confirm Password: ")
     if password != confirm:
         print_error("Passwords do not match.")
         return
-    
+
     # Generate new salt for this profile
     salt = os.urandom(16)
     # Cache key for this session
     global _SESSION_KEY
     _SESSION_KEY = derive_key(password, salt)
-    
+
     config = copy.deepcopy(DEFAULT_CONFIG)
     if mode == "fill_missing" and existing_config:
         # Transfer existing non-sensitive config
@@ -256,14 +270,53 @@ def configuration_wizard(profile_name=None):
             if section in config and section != "security":
                 config[section].update(existing_config[section])
 
-    u = input(f"GitHub Username: ").strip()
-    if u: config["github"]["username"] = u
-    
-    t = getpass.getpass(f"GitHub Token (Hidden): ").strip()
-    if t: config["github"]["token"] = t
-    
-    a = getpass.getpass(f"Gemini AI Key (Hidden): ").strip()
-    if a: config["github"]["ai_api_key"] = a
+    # GitHub Username - show existing if available
+    if existing_username and mode != "overwrite":
+        print_info(f"Current GitHub Username: {existing_username}")
+        u = input(f"New GitHub Username [press Enter to keep current]: ").strip()
+        if u:
+            config["github"]["username"] = u
+        else:
+            config["github"]["username"] = existing_username
+    else:
+        u = input(f"GitHub Username: ").strip()
+        if u: config["github"]["username"] = u
+
+    # GitHub Token - show if set
+    if existing_token_set and mode != "overwrite":
+        print_info("Current GitHub Token: [configured]")
+        t = getpass.getpass(f"New GitHub Token [press Enter to keep current]: ").strip()
+        if t:
+            config["github"]["token"] = t
+        else:
+            # Keep existing encrypted token
+            try:
+                with open(config_path, 'r') as f:
+                    existing_config_keep = yaml.safe_load(f) or {}
+                    config["github"]["token"] = existing_config_keep.get('github', {}).get('token', '')
+            except:
+                pass
+    else:
+        t = getpass.getpass(f"GitHub Token (Hidden): ").strip()
+        if t: config["github"]["token"] = t
+
+    # AI API Key - show if set
+    if existing_ai_key_set and mode != "overwrite":
+        print_info("Current Gemini AI Key: [configured]")
+        a = getpass.getpass(f"New Gemini AI Key [press Enter to keep current]: ").strip()
+        if a:
+            config["github"]["ai_api_key"] = a
+        else:
+            # Keep existing encrypted AI key
+            try:
+                with open(config_path, 'r') as f:
+                    existing_config_keep = yaml.safe_load(f) or {}
+                    config["github"]["ai_api_key"] = existing_config_keep.get('github', {}).get('ai_api_key', '')
+            except:
+                pass
+    else:
+        a = getpass.getpass(f"Gemini AI Key (Hidden): ").strip()
+        if a: config["github"]["ai_api_key"] = a
 
     try:
         save_config = copy.deepcopy(config)
@@ -273,7 +326,7 @@ def configuration_wizard(profile_name=None):
 
         with open(config_path, "w") as f:
             yaml.dump(save_config, f, default_flow_style=False)
-        
+
         if os.name != 'nt': os.chmod(config_path, 0o600)
         set_active_profile(profile_name)
         print_success(f"Profile '{profile_name}' encrypted and locked!")

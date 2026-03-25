@@ -1,5 +1,5 @@
 import subprocess
-import inquirer
+import questionary
 from ..utils.ui import print_success, print_error, print_info, print_header
 
 def cherry_pick_commit(args):
@@ -7,11 +7,7 @@ def cherry_pick_commit(args):
     commit_hash = args.commit_hash
     if not commit_hash:
         print_header("Cherry-Pick Commit")
-        questions = [
-            inquirer.Text("commit_hash", message="Enter the hash of the commit to cherry-pick")
-        ]
-        answers = inquirer.prompt(questions)
-        commit_hash = answers["commit_hash"]
+        commit_hash = questionary.text("Enter the hash of the commit to cherry-pick").ask()
 
     if not commit_hash:
         print_error("No commit hash provided. Exiting.")

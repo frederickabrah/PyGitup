@@ -1,4 +1,4 @@
-import inquirer
+import questionary
 from urllib.parse import urlparse
 from .api import get_repo_info, github_request, get_commit_history, get_issues, get_contributors, get_repo_languages, get_community_profile, get_latest_release, get_repo_forks, compare_commits
 from ..utils.ui import display_repo_info, display_traffic_trends, print_error, print_warning, print_info, print_header, print_success
@@ -125,11 +125,7 @@ def get_detailed_repo_info(args, github_token):
     url = args.url if hasattr(args, 'url') and args.url else None
 
     if not url:
-        questions = [
-            inquirer.Text("url", message="Enter the GitHub repository URL")
-        ]
-        answers = inquirer.prompt(questions)
-        url = answers["url"]
+        url = questionary.text("Enter the GitHub repository URL").ask()
 
     owner, repo_name = parse_github_url(url)
     

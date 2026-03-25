@@ -1,4 +1,4 @@
-import inquirer
+import questionary
 from .api import github_request
 from ..utils.security import check_is_sensitive
 from ..utils.ui import print_success, print_error, print_info, print_header, print_warning
@@ -13,34 +13,24 @@ def manage_gists(args, github_username, github_token):
 
     if not action:
         print_header("Gist Management")
-        questions = [
-            inquirer.List(
-                "action",
-                message="What Gist operation would you like to perform?",
-                choices=["create", "list"],
-            )
-        ]
-        answers = inquirer.prompt(questions)
-        if not answers:
+        action = questionary.select(
+            "What Gist operation would you like to perform?",
+            choices=["create", "list"]
+        ).ask()
+        
+        if not action:
             print_info("Operation cancelled.")
             return
-        action = answers["action"]
 
         if action == "create":
-            gist_questions = [
-                inquirer.Text("filename", message="Enter the filename for the Gist"),
-                inquirer.Text("content", message="Enter the content of the Gist"),
-                inquirer.Text("description", message="Enter an optional description for the Gist"),
-                inquirer.Confirm("public", message="Make the Gist public?", default=False),
-            ]
-            gist_answers = inquirer.prompt(gist_questions)
-            if not gist_answers:
+            filename = questionary.text("Enter the filename for the Gist:").ask()
+            content = questionary.text("Enter the content of the Gist:").ask()
+            description = questionary.text("Enter an optional description for the Gist:").ask()
+            public = questionary.confirm("Make the Gist public?", default=False).ask()
+            
+            if not filename or not content:
                 print_info("Operation cancelled.")
                 return
-            filename = gist_answers["filename"]
-            content = gist_answers["content"]
-            description = gist_answers["description"]
-            public = gist_answers["public"]
 
     try:
         if action == "create":

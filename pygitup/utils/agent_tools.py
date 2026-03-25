@@ -89,19 +89,36 @@ def create_git_checkpoint(message):
     """Creates a temporary git stash as a safety checkpoint."""
     try:
         # Check if it's a git repo
-        if not os.path.isdir(".git"): return None
-        
+        if not os.path.isdir(".git"):
+            return None
+
         # Create a stash with a specific message
         stash_msg = f"PyGitUp Checkpoint: {message}"
         # We use --include-untracked to ensure new files are also saved
-        subprocess.run(["git", "stash", "push", "--include-untracked", "-m", stash_msg], 
+        result = subprocess.run(["git", "stash", "push", "--include-untracked", "-m", stash_msg],
                        capture_output=True, text=True, check=True)
         
-        # Immediately re-apply it so the workspace doesn't change, 
+        # Verify checkpoint was created
+        if "No local changes to save" in result.stderr:
+            print_warning("No changes to checkpoint")
+            return None
+        
+        # Immediately re-apply it so the workspace doesn't change,
         # but now we have a recovery point in 'git stash list'
-        subprocess.run(["git", "stash", "apply", "stash@{0}"], 
+        subprocess.run(["git", "stash", "apply", "stash@{0}"],
                        capture_output=True, text=True, check=True)
-        return "stash@{0}"
+        
+        # Verify stash exists
+        stash_list = subprocess.run(["git", "stash", "list"],
+                                   capture_output=True, text=True, check=True)
+        if stash_msg in stash_list.stdout:
+            return "stash@{0}"
+        else:
+            print_warning("Checkpoint created but not found in stash list")
+            return None
+    except subprocess.CalledProcessError as e:
+        print_warning(f"Safety Checkpoint failed: {e.stderr if e.stderr else e}")
+        return None
     except Exception as e:
         print_warning(f"Safety Checkpoint failed: {e}")
         return None

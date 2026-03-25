@@ -1,5 +1,5 @@
 import subprocess
-import inquirer
+import questionary
 from ..utils.ui import print_success, print_error, print_info, print_header
 
 def manage_tags(args):
@@ -10,29 +10,16 @@ def manage_tags(args):
 
     if not action:
         print_header("Tag Management")
-        questions = [
-            inquirer.List(
-                "action",
-                message="What tag operation would you like to perform?",
-                choices=["list", "create", "delete"],
-            )
-        ]
-        answers = inquirer.prompt(questions)
-        action = answers["action"]
+        action = questionary.select(
+            "What tag operation would you like to perform?",
+            choices=["list", "create", "delete"],
+        ).ask()
 
         if action in ["create", "delete"]:
-            tag_questions = [
-                inquirer.Text("tag_name", message=f"Enter the name of the tag to {action}")
-            ]
-            tag_answers = inquirer.prompt(tag_questions)
-            tag_name = tag_answers["tag_name"]
+            tag_name = questionary.text(f"Enter the name of the tag to {action}").ask()
 
         if action == "create":
-            message_questions = [
-                inquirer.Text("message", message="Enter an optional annotation message for the tag")
-            ]
-            message_answers = inquirer.prompt(message_questions)
-            message = message_answers["message"]
+            message = questionary.text("Enter an optional annotation message for the tag").ask()
 
     try:
         if action == "list":

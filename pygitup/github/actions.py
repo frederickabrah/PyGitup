@@ -1,4 +1,4 @@
-import inquirer
+import questionary
 import os
 import subprocess
 import requests
@@ -197,19 +197,14 @@ def manage_actions(args, github_username, github_token, config):
 
     if not action:
         print_header("CI/CD Control Center")
-        questions = [
-            inquirer.List(
-                "action",
-                message="Select an Actions operation",
-                choices=["Generate CI/CD Workflow", "Watch Live Build", "Monitor Status & Metrics", "Trigger Workflow", "Enable Workflow", "Disable Workflow"],
-            )
-        ]
-        answers = inquirer.prompt(questions)
-        if not answers: return
-        action = answers["action"]
+        action = questionary.select(
+            "Select an Actions operation",
+            choices=["Generate CI/CD Workflow", "Watch Live Build", "Monitor Status & Metrics", "Trigger Workflow", "Enable Workflow", "Disable Workflow"],
+        ).ask()
+        if not action: return
 
     if not repo_name:
-        repo_name = inquirer.prompt([inquirer.Text("repo", message="Enter the repository name")])["repo"]
+        repo_name = questionary.text("Enter the repository name").ask()
 
     if action == "Generate CI/CD Workflow":
         setup_cicd_workflow(github_username, github_token, repo_name, config)
@@ -254,7 +249,7 @@ def manage_actions(args, github_username, github_token, config):
             return
         
         choices = [(w['name'], w['id']) for w in workflows]
-        w_choice = inquirer.prompt([inquirer.List("w", message="Select workflow to trigger", choices=choices)])["w"]
+        w_choice = questionary.select("Select workflow to trigger", choices=choices).ask()
         ref = input("Enter ref (branch/tag) [main]: ") or "main"
         
         trigger_url = f"{base_url}/workflows/{w_choice}/dispatches"
@@ -267,6 +262,6 @@ def manage_actions(args, github_username, github_token, config):
         w_resp = github_request("GET", f"{base_url}/workflows", github_token)
         workflows = w_resp.json().get("workflows", [])
         choices = [(w['name'], w['id']) for w in workflows]
-        w_choice = inquirer.prompt([inquirer.List("w", message=f"Select workflow to {action.lower()}", choices=choices)])["w"]
+        w_choice = questionary.select(f"Select workflow to {action.lower()}", choices=choices).ask()
         toggle_workflow_api(github_username, repo_name, github_token, w_choice, enable=enable)
         print_success(f"Workflow {action.lower()}d successfully.")

@@ -673,38 +673,59 @@ def run_enhanced_sast_scan(directory: str, max_files: int = 100) -> List[Securit
     files_scanned = 0
 
     target_extensions = ['.py', '.pyw', '.pyi']
-
+    
+    # Collect files first for progress bar
+    files_to_scan = []
     for root, _, files in os.walk(directory):
         skip_dirs = ['.git', '__pycache__', 'node_modules', 'venv', '.venv', 'build', 'dist', '.eggs']
         root_lower = root.lower()
         if any(skip_dir in root_lower for skip_dir in skip_dirs):
             continue
-        
         for file in files:
-            if files_scanned >= max_files:
-                break
-                
             if any(file.endswith(ext) for ext in target_extensions):
-                file_path = os.path.join(root, file)
-                files_scanned += 1
-                
-                try:
-                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                        source_code = f.read()
-                    
-                    tree = ast.parse(source_code, filename=file_path)
-                    visitor = EnhancedSASTVisitor(source_code, file_path)
-                    visitor.visit(tree)
-                    all_findings.extend(visitor.vulnerabilities)
-                    
-                    secret_findings = detect_secrets_in_content(source_code, file_path)
-                    all_findings.extend(secret_findings)
-                    
-                except SyntaxError:
-                    pass
-                except Exception as e:
-                    if os.environ.get('PYGITUP_DEBUG'):
-                        print_warning(f"Error scanning {file_path}: {e}")
+                files_to_scan.append(os.path.join(root, file))
+    
+    files_to_scan = files_to_scan[:max_files]
+    total_files = len(files_to_scan)
+    
+    if total_files == 0:
+        print_success("No files to scan.")
+        return []
+    
+    print_info(f"Found {total_files} files to scan")
+    
+    # Try to use tqdm for progress bar
+    try:
+        from tqdm import tqdm
+        use_progress = True
+    except ImportError:
+        use_progress = False
+    
+    iterator = tqdm(files_to_scan, desc="Scanning", unit="file") if use_progress else files_to_scan
+
+    for file_path in iterator:
+        files_scanned += 1
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                source_code = f.read()
+
+            tree = ast.parse(source_code, filename=file_path)
+            visitor = EnhancedSASTVisitor(source_code, file_path)
+            visitor.visit(tree)
+            all_findings.extend(visitor.vulnerabilities)
+
+            secret_findings = detect_secrets_in_content(source_code, file_path)
+            all_findings.extend(secret_findings)
+            
+            # Update progress bar with findings count
+            if use_progress:
+                iterator.set_postfix({'found': len(all_findings)})
+
+        except SyntaxError:
+            pass
+        except Exception as e:
+            if os.environ.get('PYGITUP_DEBUG'):
+                print_warning(f"Error scanning {file_path}: {e}")
 
     if all_findings:
         _display_security_findings(all_findings)
@@ -992,117 +1013,140 @@ def run_comprehensive_security_scan(directory: str = ".", include_deps: bool = T
         List of all security findings
     """
     print_header("🛡️ Comprehensive Security Scan")
+    print_info("Press Ctrl+C at any time to cancel")
+    
+    # Estimate scan time
+    file_count = 0
+    for root, _, files in os.walk(directory):
+        if '.git' not in root:
+            file_count += sum(1 for f in files if f.endswith(('.py', '.pyw', '.pyi', '.js', '.ts')))
+    
+    estimated_seconds = file_count * 0.5  # ~0.5s per file
+    if include_deps:
+        estimated_seconds += 30  # ~30s for dependency scan
+    
+    print_info(f"Scanning {file_count} files...")
+    print_info(f"Estimated time: {estimated_seconds:.0f}-{estimated_seconds*2:.0f} seconds")
     
     all_findings = []
     
-    # 1. Enhanced SAST Scan
-    sast_findings = run_enhanced_sast_scan(directory)
-    all_findings.extend(sast_findings)
-    
-    # 2. Dependency Scan (if enabled)
-    if include_deps:
-        print_info("Scanning dependencies for vulnerabilities...")
-        try:
-            result = subprocess.run(
-                ["pip-audit", "--format", "json", "--desc"],
-                capture_output=True,
-                text=True,
-                timeout=120
-            )
-            if result.stdout:
-                try:
-                    dep_vulns = json.loads(result.stdout)
-                    if isinstance(dep_vulns, dict):
-                        for pkg_name, pkg_data in dep_vulns.items():
-                            if not isinstance(pkg_data, dict):
-                                continue
-                            vulns_list = pkg_data.get('vulns', [])
-                            if not vulns_list:
-                                continue
-                            for vuln in vulns_list:
-                                if not isinstance(vuln, dict):
-                                    continue
-                                cvss_data = vuln.get('CVSS')
-                                cvss_score = 0.0
-                                severity = "high"
-                                if cvss_data:
-                                    if isinstance(cvss_data, dict):
-                                        cvss_score = cvss_data.get('score', 0.0)
-                                    elif isinstance(cvss_data, (int, float)):
-                                        cvss_score = cvss_data
-                                    if cvss_score >= 9.0:
-                                        severity = "critical"
-                                    elif cvss_score >= 7.0:
-                                        severity = "high"
-                                    elif cvss_score >= 4.0:
-                                        severity = "medium"
-                                
-                                fixed_versions = vuln.get('fix_versions', [])
-                                fixed_version = fixed_versions[0] if isinstance(fixed_versions, list) and fixed_versions else None
-                                
-                                all_findings.append(SecurityFinding(
-                                    id=f"DEP-{vuln.get('id', 'UNKNOWN')}",
-                                    category="known_vulnerability",
-                                    severity=severity,
-                                    title=f"Vulnerable Dependency: {pkg_name}",
-                                    description=vuln.get('details', 'No description'),
-                                    file="requirements.txt",
-                                    line=0,
-                                    code=f"{pkg_name}=={pkg_data.get('version', 'unknown')}",
-                                    remediation=f"Update to {fixed_version or 'latest'}",
-                                    cvss_score=cvss_score
-                                ))
-                except json.JSONDecodeError as e:
-                    print_warning(f"Dependency scan parse error: {e}")
-        except FileNotFoundError:
-            print_warning("'pip-audit' not installed. Skipping dependency scan.")
-        except subprocess.TimeoutExpired:
-            print_warning("Dependency scan timed out.")
-        except Exception as e:
-            print_warning(f"Dependency scan failed: {e}")
-
-    # 3. AI Enhancement (optional)
-    if use_ai and config:
-        from .ai_validator import get_ai_api_key, enhance_finding_with_ai
+    try:
+        # 1. Enhanced SAST Scan
+        sast_findings = run_enhanced_sast_scan(directory)
+        all_findings.extend(sast_findings)
         
-        api_key = get_ai_api_key('gemini', config)
-        if api_key:
-            print_info("Enhancing findings with AI analysis...")
-            enhanced_count = 0
-            for i, finding in enumerate(all_findings):
-                # Convert SecurityFinding to dict for AI processing
-                finding_dict = {
-                    'type': finding.category,
-                    'file': finding.file,
-                    'line': finding.line,
-                    'description': finding.description,
-                    'code': finding.code,
-                    'severity': finding.severity
-                }
-                enhanced = enhance_finding_with_ai(finding_dict, config)
-                if enhanced.get('ai_enhanced'):
-                    enhanced_count += 1
+        # 2. Dependency Scan (if enabled)
+        if include_deps:
+            print_info("Scanning dependencies for vulnerabilities...")
+            try:
+                result = subprocess.run(
+                    ["pip-audit", "--format", "json", "--desc"],
+                    capture_output=True,
+                    text=True,
+                    timeout=120
+                )
+                if result.stdout:
+                    try:
+                        dep_vulns = json.loads(result.stdout)
+                        if isinstance(dep_vulns, dict):
+                            for pkg_name, pkg_data in dep_vulns.items():
+                                if not isinstance(pkg_data, dict):
+                                    continue
+                                vulns_list = pkg_data.get('vulns', [])
+                                if not vulns_list:
+                                    continue
+                                for vuln in vulns_list:
+                                    if not isinstance(vuln, dict):
+                                        continue
+                                    cvss_data = vuln.get('CVSS')
+                                    cvss_score = 0.0
+                                    severity = "high"
+                                    if cvss_data:
+                                        if isinstance(cvss_data, dict):
+                                            cvss_score = cvss_data.get('score', 0.0)
+                                        elif isinstance(cvss_data, (int, float)):
+                                            cvss_score = cvss_data
+                                        if cvss_score >= 9.0:
+                                            severity = "critical"
+                                        elif cvss_score >= 7.0:
+                                            severity = "high"
+                                        elif cvss_score >= 4.0:
+                                            severity = "medium"
+
+                                    fixed_versions = vuln.get('fix_versions', [])
+                                    fixed_version = fixed_versions[0] if isinstance(fixed_versions, list) and fixed_versions else None
+
+                                    all_findings.append(SecurityFinding(
+                                        id=f"DEP-{vuln.get('id', 'UNKNOWN')}",
+                                        category="known_vulnerability",
+                                        severity=severity,
+                                        title=f"Vulnerable Dependency: {pkg_name}",
+                                        description=vuln.get('details', 'No description'),
+                                        file="requirements.txt",
+                                        line=0,
+                                        code=f"{pkg_name}=={pkg_data.get('version', 'unknown')}",
+                                        remediation=f"Update to {fixed_version or 'latest'}",
+                                        cvss_score=cvss_score
+                                    ))
+                    except json.JSONDecodeError as e:
+                        print_warning(f"Dependency scan parse error: {e}")
+            except FileNotFoundError:
+                print_warning("'pip-audit' not installed. Skipping dependency scan.")
+            except subprocess.TimeoutExpired:
+                print_warning("Dependency scan timed out.")
+            except Exception as e:
+                print_warning(f"Dependency scan failed: {e}")
+
+            # 3. AI Enhancement (optional)
+            if use_ai and config:
+                from .ai_validator import get_ai_api_key, enhance_finding_with_ai
+                
+                api_key = get_ai_api_key('gemini', config)
+                if api_key:
+                    print_info("Enhancing findings with AI analysis...")
+                    enhanced_count = 0
+                    for i, finding in enumerate(all_findings):
+                        # Convert SecurityFinding to dict for AI processing
+                        finding_dict = {
+                            'type': finding.category,
+                            'file': finding.file,
+                            'line': finding.line,
+                            'description': finding.description,
+                            'code': finding.code,
+                            'severity': finding.severity
+                        }
+                        enhanced = enhance_finding_with_ai(finding_dict, config)
+                        if enhanced.get('ai_enhanced'):
+                            enhanced_count += 1
             
-            if enhanced_count > 0:
-                print_success(f"AI enhanced {enhanced_count} findings")
-        else:
-            print_warning("AI enhancement skipped: API key not configured")
-            print_info("Set GEMINI_API_KEY or configure in PyGitUp to enable AI analysis")
+                    if enhanced_count > 0:
+                        print_success(f"AI enhanced {enhanced_count} findings")
+                else:
+                    print_warning("AI enhancement skipped: API key not configured")
+                    print_info("Set GEMINI_API_KEY or configure in PyGitUp to enable AI analysis")
 
-    # 4. Log the scan
-    AUDIT_LOGGER.log_event(
-        AuditEventType.SECURITY_SCAN,
-        user=os.environ.get('USER', 'unknown'),
-        details={
-            "directory": directory,
-            "findings_count": len(all_findings),
-            "critical_count": len([f for f in all_findings if f.severity == 'critical']),
-            "message": f"Security scan completed with {len(all_findings)} findings"
-        },
-        severity="high" if any(f.severity == 'critical' for f in all_findings) else "info"
-    )
+                # 4. Log the scan
+                AUDIT_LOGGER.log_event(
+                    AuditEventType.SECURITY_SCAN,
+                    user=os.environ.get('USER', 'unknown'),
+                    details={
+                        "directory": directory,
+                        "findings_count": len(all_findings),
+                        "critical_count": len([f for f in all_findings if f.severity == 'critical']),
+                        "message": f"Security scan completed with {len(all_findings)} findings"
+                    },
+                    severity="high" if any(f.severity == 'critical' for f in all_findings) else "info"
+                )
 
-    return all_findings
+        return all_findings
+        
+    except KeyboardInterrupt:
+        print_info("\n⚠️  Scan cancelled by user")
+        print_info(f"Partial results: {len(all_findings)} findings detected before cancellation")
+        return all_findings
+    except Exception as e:
+        print_error(f"Scan failed: {e}")
+        return all_findings
 
 
 def validate_token_security(token: str, token_type: str = "github") -> Tuple[bool, List[str]]:

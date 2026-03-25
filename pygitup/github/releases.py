@@ -32,15 +32,31 @@ def get_release_input(config, args, github_username, github_token):
     if args and args.version:
         version = args.version
     else:
-        version = input("Enter version tag (e.g., v1.0.0): ")
-    
+        # Validate version BEFORE collecting notes
+        while True:
+            version = input("Enter version tag (e.g., v1.0.0): ").strip()
+            if not version.startswith('v') and not version[0].isdigit():
+                print_error("Version should start with 'v' or a number (e.g., v1.0.0)")
+                continue
+            # Check if version already exists
+            from .api import get_latest_release
+            latest = get_latest_release(github_username, repo_name, github_token)
+            if latest.status_code == 200:
+                existing = latest.json()
+                if existing.get('tag_name') == version:
+                    print_warning(f"Version {version} already exists!")
+                    overwrite = input("Create anyway? (y/n): ").strip().lower()
+                    if overwrite != 'y':
+                        continue
+            break
+
     if args and args.name:
         name = args.name
     else:
         default_name = f"Release {version}"
         name_input = input(f"Enter release name (default: {default_name}): ")
         name = name_input if name_input else default_name
-    
+
     # Release Notes Logic
     changelog = ""
     
