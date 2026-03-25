@@ -435,10 +435,14 @@ def main():
                 print("3: Both")
                 sbom_choice = input("\n👉 Choice [1]: ") or "1"
                 
+                # Get current directory
+                current_dir = os.getcwd()
+                print_info(f"   Scanning project: {current_dir}")
+
                 if sbom_choice in ['1', '3']:
-                    generate_sbom_spdx("sbom.spdx.json")
+                    generate_sbom_spdx("sbom.spdx.json", directory=current_dir)
                 if sbom_choice in ['2', '3']:
-                    generate_sbom_cyclonedx("sbom.cyclonedx.json")
+                    generate_sbom_cyclonedx("sbom.cyclonedx.json", directory=current_dir)
             elif mode == "rotate-token":
                 from .utils.token_manager import get_rotation_manager
                 manager = get_rotation_manager()
