@@ -676,6 +676,10 @@ class PyGitUpTUI(App):
             while turn_count < max_turns:
                 turn_count += 1
                 
+                # Warn user when approaching turn limit
+                if turn_count >= max_turns - 2:
+                    self.query_one("#chat-log").write(RichMarkdown(f"⚠️ **Approaching turn limit:** {max_turns - turn_count} turns remaining"))
+
                 # Add current query to history (Initial query or 'Proceed' message)
                 self.chat_history.append({"role": "user", "text": query})
                 
@@ -757,35 +761,68 @@ class PyGitUpTUI(App):
                         # PAUSE: Wait for user to submit input via on_input_submitted
                         self.query_one("#chat-loader").remove_class("-loading")
                         self.user_signal.clear()
-                        await self.user_signal.wait()
+                        try:
+                            # Add timeout to prevent indefinite hanging (5 minutes)
+                            await asyncio.wait_for(self.user_signal.wait(), timeout=300)
+                        except asyncio.TimeoutError:
+                            # Handle timeout - cancel the operation
+                            self.query_one("#chat-log").write(RichMarkdown("⏰ **Timeout:** No response received. Operation cancelled."))
+                            self.agent_busy = False
+                            self.query_one("#chat-loader").remove_class("-loading")
+                            self.pending_tool = None
+                            self.user_response = None
+                            self.query_one("#chat-input").placeholder = "Ask a technical question..."
+                            return  # Exit mentor_task
                         
                         user_val = self.user_response
+                        # Safety check: ensure user_response was actually set
+                        if user_val is None:
+                            user_val = ""
                         self.user_response = None
                         self.pending_tool = None
                         self.query_one("#chat-input").placeholder = "Ask a technical question..."
                         self.query_one("#chat-loader").add_class("-loading")
 
-                        # Process the user's choice
+                        # Process the user's choice with error handling
                         if tc['name'] == "ask_user":
                             result = {"response": user_val}
                             self.query_one("#chat-log").write(RichMarkdown(f"💬 **You:** {user_val}"))
                         elif tc['name'] == "github_issue" and tc['args'].get('action') == "comment":
-                            tc['args']['body'] = user_val
-                            result = execute_agent_tool(tc['name'], tc['args'])
-                            self.query_one("#chat-log").write(RichMarkdown(f"💬 **Comment Posted**"))
+                            try:
+                                tc['args']['body'] = user_val
+                                result = execute_agent_tool(tc['name'], tc['args'])
+                                self.query_one("#chat-log").write(RichMarkdown(f"💬 **Comment Posted**"))
+                            except Exception as e:
+                                self.query_one("#chat-log").write(RichMarkdown(f"❌ **Comment Error:** {e}"))
+                                result = {"error": f"Comment failed: {e}"}
                         elif user_val.lower() in ['y', 'yes']:
-                            # Inform user about the safety net
+                            # Create and verify safety checkpoint before modification
+                            checkpoint_created = False
                             if os.path.isdir(".git"):
-                                self.query_one("#chat-log").write(RichMarkdown("🛡️ **Safety Checkpoint Created** (Restore via `git stash list`)"))
-                            
+                                from ..utils.agent_tools import create_git_checkpoint
+                                checkpoint_id = create_git_checkpoint(f"Before {tc['name']}")
+                                if checkpoint_id:
+                                    self.query_one("#chat-log").write(RichMarkdown("🛡️ **Safety Checkpoint Verified** (Restore via `git stash list`)"))
+                                    checkpoint_created = True
+                                else:
+                                    self.query_one("#chat-log").write(RichMarkdown("⚠️ **Warning:** Safety checkpoint failed. Proceed with caution."))
+
                             self.query_one("#chat-log").write(RichMarkdown(f"✅ **APPROVED:** `{tc['name']}`"))
-                            result = execute_agent_tool(tc['name'], tc['args'])
+                            try:
+                                result = execute_agent_tool(tc['name'], tc['args'])
+                            except Exception as e:
+                                self.query_one("#chat-log").write(RichMarkdown(f"❌ **Tool Execution Error:** {e}"))
+                                result = {"error": f"Tool failed: {e}"}
                         else:
                             self.query_one("#chat-log").write(RichMarkdown(f"❌ **DENIED:** `{tc['name']}`"))
                             result = {"error": "User denied action."}
                     else:
-                        # Non-privileged tools: Execute immediately
-                        result = execute_agent_tool(tc['name'], tc['args'])
+                        # Non-privileged tools: Execute immediately with error handling
+                        try:
+                            result = execute_agent_tool(tc['name'], tc['args'])
+                        except Exception as e:
+                            self.query_one("#chat-log").write(RichMarkdown(f"❌ **Tool Error:** {e}"))
+                            result = {"error": f"Tool failed: {e}"}
                     
                     self.chat_history.append({"role": "user", "text": "", "tool_results": [{"name": tc['name'], "content": result}]})
                 

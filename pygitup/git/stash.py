@@ -1,5 +1,5 @@
 import subprocess
-import inquirer
+import questionary
 from ..utils.ui import print_success, print_error, print_info, print_header
 
 def manage_stashes(args):
@@ -9,22 +9,13 @@ def manage_stashes(args):
 
     if not action:
         print_header("Stash Management")
-        questions = [
-            inquirer.List(
-                "action",
-                message="What stash operation would you like to perform?",
-                choices=["save", "list", "apply", "pop", "drop"],
-            )
-        ]
-        answers = inquirer.prompt(questions)
-        action = answers["action"]
+        action = questionary.select(
+            "What stash operation would you like to perform?",
+            choices=["save", "list", "apply", "pop", "drop"],
+        ).ask()
 
         if action == "save":
-            stash_questions = [
-                inquirer.Text("message", message="Enter an optional message for the stash")
-            ]
-            stash_answers = inquirer.prompt(stash_questions)
-            message = stash_answers["message"]
+            message = questionary.text("Enter an optional message for the stash").ask()
 
     try:
         if action == "save":

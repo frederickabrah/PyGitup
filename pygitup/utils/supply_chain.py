@@ -743,6 +743,15 @@ def run_supply_chain_scan(output_sbom: bool = True) -> Dict:
         Scan results dictionary
     """
     print_header("🔗 Supply Chain Security Scan")
+    print_info("Press Ctrl+C at any time to cancel")
+    
+    # Count packages for time estimate
+    packages = get_installed_packages()
+    requirements = parse_requirements_file()
+    total_deps = len(packages) + len(requirements)
+    
+    print_info(f"Found {total_deps} dependencies to analyze")
+    print_info(f"Estimated scan time: {total_deps * 0.3:.0f}-{total_deps * 0.5:.0f} seconds")
     
     results = {
         "timestamp": datetime.utcnow().isoformat(),
@@ -752,69 +761,79 @@ def run_supply_chain_scan(output_sbom: bool = True) -> Dict:
         "recommendations": []
     }
     
-    # 1. Parse dependencies
-    print_info("\n📋 Parsing dependencies...")
-    requirements = parse_requirements_file()
-    setup_deps = parse_setup_py()
-    pyproject_deps = parse_pyproject_toml()
-    
-    all_deps = {**requirements, **setup_deps, **pyproject_deps}
-    installed = get_installed_packages()
-    
-    print_info(f"   Found {len(all_deps)} declared dependencies")
-    print_info(f"   Found {len(installed)} installed packages")
-    
-    # 2. Scan for vulnerabilities
-    print_info("\n🔍 Scanning for vulnerabilities...")
-    
-    # Use pip-audit if available
-    vulns = scan_dependencies_pip_audit()
-    
-    # Also query OSV for additional coverage
-    if vulns:
-        print_success(f"   Found {len(vulns)} vulnerabilities via pip-audit")
-    else:
-        # Fallback to OSV
-        vulns = scan_dependencies_osv(installed)
-        if vulns:
-            print_success(f"   Found {len(vulns)} vulnerabilities via OSV")
-        else:
-            print_success("   No vulnerabilities detected")
-    
-    results["vulnerabilities"] = [asdict(v) for v in vulns]
-    
-    # 3. Generate SBOM
-    if output_sbom:
-        print_info("\n📦 Generating SBOM...")
-        sbom_file = generate_sbom_spdx()
-        if sbom_file:
-            results["sbom_generated"] = sbom_file
-    
-    # 4. Analyze dependency health
-    print_info("\n💚 Analyzing dependency health...")
-    health = analyze_dependency_health(installed)
-    results["health_report"] = health
-    
-    # 5. Generate recommendations
-    if vulns:
-        critical_count = len([v for v in vulns if v.severity == VulnerabilitySeverity.CRITICAL])
-        high_count = len([v for v in vulns if v.severity == VulnerabilitySeverity.HIGH])
+    try:
+        # 1. Parse dependencies
+        print_info("\n📋 Parsing dependencies...")
+        requirements = parse_requirements_file()
+        setup_deps = parse_setup_py()
+        pyproject_deps = parse_pyproject_toml()
         
-        if critical_count > 0:
-            results["recommendations"].append(f"🚨 CRITICAL: Update {critical_count} packages with critical vulnerabilities immediately")
-        if high_count > 0:
-            results["recommendations"].append(f"⚠️ HIGH: Update {high_count} packages with high severity vulnerabilities")
+        all_deps = {**requirements, **setup_deps, **pyproject_deps}
+        installed = get_installed_packages()
+        
+        print_info(f"   Found {len(all_deps)} declared dependencies")
+        print_info(f"   Found {len(installed)} installed packages")
+        
+        # 2. Scan for vulnerabilities
+        print_info("\n🔍 Scanning for vulnerabilities...")
+        
+        # Use pip-audit if available
+        vulns = scan_dependencies_pip_audit()
+        
+        # Also query OSV for additional coverage
+        if vulns:
+            print_success(f"   Found {len(vulns)} vulnerabilities via pip-audit")
+        else:
+            # Fallback to OSV
+            vulns = scan_dependencies_osv(installed)
+            if vulns:
+                print_success(f"   Found {len(vulns)} vulnerabilities via OSV")
+            else:
+                print_success("   No vulnerabilities detected")
+        
+        results["vulnerabilities"] = [asdict(v) for v in vulns]
+        
+        # 3. Generate SBOM
+        if output_sbom:
+            print_info("\n📦 Generating SBOM...")
+            sbom_file = generate_sbom_spdx()
+            if sbom_file:
+                results["sbom_generated"] = sbom_file
+        
+        # 4. Analyze dependency health
+        print_info("\n💚 Analyzing dependency health...")
+        health = analyze_dependency_health(installed)
+        results["health_report"] = health
+        
+        # 5. Generate recommendations
+        if vulns:
+            critical_count = len([v for v in vulns if v.severity == VulnerabilitySeverity.CRITICAL])
+            high_count = len([v for v in vulns if v.severity == VulnerabilitySeverity.HIGH])
+            
+            if critical_count > 0:
+                results["recommendations"].append(f"🚨 CRITICAL: Update {critical_count} packages with critical vulnerabilities immediately")
+            if high_count > 0:
+                results["recommendations"].append(f"⚠️ HIGH: Update {high_count} packages with high severity vulnerabilities")
+        
+        if health.get("outdated_packages"):
+            results["recommendations"].append(f"📦 {len(health['outdated_packages'])} packages are outdated")
+        
+        if health.get("unmaintained_packages"):
+            results["recommendations"].append(f"⚠️ {len(health['unmaintained_packages'])} packages appear unmaintained")
+        
+        # Display results
+        _display_scan_results(results)
+        
+        return results
     
-    if health.get("outdated_packages"):
-        results["recommendations"].append(f"📦 {len(health['outdated_packages'])} packages are outdated")
-    
-    if health.get("unmaintained_packages"):
-        results["recommendations"].append(f"⚠️ {len(health['unmaintained_packages'])} packages appear unmaintained")
-    
-    # Display results
-    _display_scan_results(results)
-    
-    return results
+    except KeyboardInterrupt:
+        print_info("\n⚠️  Scan cancelled by user")
+        print_info(f"Partial results available")
+        return results
+    except Exception as e:
+        print_error(f"Supply chain scan failed: {e}")
+        results['error'] = str(e)
+        return results
 
 
 def _display_scan_results(results: Dict):

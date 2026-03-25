@@ -17,8 +17,8 @@ def smart_push(github_username, github_token, config, args=None):
     if args and args.squash_pattern:
         patterns = args.squash_pattern.split(",")
     else:
-        patterns_input = input("Enter commit message patterns to squash (comma-separated): ")
-        patterns = patterns_input.split(",") if patterns_input else ["typo", "fix", "update"]
+        patterns_input = input("Enter commit message patterns to squash (comma-separated) [typo,fix,update,WIP]: ")
+        patterns = patterns_input.split(",") if patterns_input else ["typo", "fix", "update", "WIP"]
 
     print_info(f"Smart pushing to {repo_name} with squash patterns: {patterns}")
 
@@ -56,6 +56,16 @@ def smart_push(github_username, github_token, config, args=None):
             squashed_messages.append(msg)
 
         new_commit_message = f"Squashed {len(squashed_messages)} commits\n\n" + "\n".join(f"- {msg}" for msg in squashed_messages)
+
+        print_warning("⚠️  FORCE PUSH WARNING:")
+        print_warning("  This will OVERWRITE remote history!")
+        print_warning("  All collaborators must re-clone!")
+        confirm = input("\nType 'YES' to confirm force push: ").strip()
+        if confirm != 'YES':
+            print_info("Force push cancelled. Pushing normally...")
+            subprocess.run(["git", "push"], check=True)
+            print_success("Pushed to GitHub.")
+            return
 
         print_info(f"Resetting to {squash_base} and preparing to squash.")
         subprocess.run(["git", "reset", "--soft", squash_base], check=True)

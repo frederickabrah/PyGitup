@@ -40,8 +40,9 @@ def scan_todos(github_username, github_token, config, args=None):
     else:
         repo_name = input("Enter repository name: ")
 
-    pattern_input = args.pattern if args and args.pattern else input("Enter file patterns (e.g., *.py,*.js) [*.py]: ")
-    file_patterns = pattern_input.split(",") if pattern_input else ["*.py"]
+    pattern_input = args.pattern if args and args.pattern else input("Enter file patterns (e.g., *.py,*.js) [*.py,*.js,*.md]: ")
+    # Use default patterns if none provided
+    file_patterns = pattern_input.split(",") if pattern_input else ["*.py", "*.js", "*.md"]
 
     # Fetch existing issues to avoid duplicates
     print_info("Checking existing issues to prevent duplicates...")

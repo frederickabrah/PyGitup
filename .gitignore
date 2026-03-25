@@ -151,3 +151,15 @@ pygitup.yaml
 token.json
 .pygitup_offline_queue
 push_command.txt
+
+# Development/Debug documentation (not for production)
+ACTUAL_TODO.md
+COMMIT_EDITOR_BUGS.md
+COMMIT_EDITOR_FIXES.md
+ENHANCEMENT_PROGRESS.md
+IMPROVEMENTS_STATUS.md
+QUICK_WINS_PLAN.md
+REMAINING_UX_ISSUES.md
+TIME_ESTIMATES_FEATURE.md
+TUI_AGENT_FIXES.md
+UX_AUDIT_REPORT.md

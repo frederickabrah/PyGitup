@@ -9,6 +9,7 @@ from ..github.api import update_file, get_file_info, create_repo, get_repo_info,
 from ..utils.security import scan_directory_for_sensitive_files, audit_files_and_prompt, check_is_sensitive
 from ..utils.validation import validate_repo_name, validate_file_path, sanitize_input, normalize_repo_path, validate_git_url
 from ..utils.ui import print_header, print_info, print_success, print_error, print_warning
+from ..utils.ux_helpers import estimate_file_operation_time, estimate_repo_operation_time
 
 TQDM_AVAILABLE = True # Assume available for now
 
@@ -18,12 +19,12 @@ def get_project_directory_input(config, args=None):
         project_path = args.path
     else:
         project_path = input("Enter the full path to your project directory: ")
-    
+
     if args and args.repo:
         repo_name = args.repo
     else:
         repo_name = input("Enter the desired name for your GitHub repository: ")
-    
+
     if args and args.description is not None:
         repo_description = args.description
     else:
@@ -31,7 +32,7 @@ def get_project_directory_input(config, args=None):
         repo_description = input(f"Enter a description for your repository (default: {default_desc}): ")
         if not repo_description:
             repo_description = default_desc
-    
+
     if args and args.private is not None:
         is_private = args.private
     else:
@@ -43,6 +44,37 @@ def get_project_directory_input(config, args=None):
             is_private = False
         else:
             is_private = default_private
+
+    # Check for common large folders that shouldn't be uploaded
+    if os.path.isdir(project_path):
+        large_folders = []
+        for folder in ['node_modules', 'venv', '.venv', 'env', '__pycache__', 'build', 'dist', '.git']:
+            if os.path.isdir(os.path.join(project_path, folder)):
+                large_folders.append(folder)
+        
+        if large_folders:
+            print_warning(f"⚠️  Found common folders that shouldn't be uploaded: {', '.join(large_folders)}")
+            print_info("Consider adding these to .gitignore before uploading:")
+            for folder in large_folders:
+                print(f"  - {folder}/")
+            
+            # Calculate total size
+            total_size = 0
+            for folder in large_folders:
+                folder_path = os.path.join(project_path, folder)
+                for dirpath, dirnames, filenames in os.walk(folder_path):
+                    for f in filenames:
+                        fp = os.path.join(dirpath, f)
+                        total_size += os.path.getsize(fp)
+            
+            size_str = f"{total_size / (1024*1024):.1f} MB" if total_size > 1024*1024 else f"{total_size / 1024:.1f} KB"
+            print_info(f"Total size of excluded folders: {size_str}")
+            print_info(f"Estimated upload time without these: {estimate_file_operation_time(total_size, 'upload')}")
+            
+            choice = input("\nProceed anyway? (y/n): ").strip().lower()
+            if choice != 'y':
+                print_info("Operation cancelled. Please add these to .gitignore and try again.")
+                return None, None, None, None
 
     return project_path, repo_name, repo_description, is_private
 
@@ -104,19 +136,34 @@ def push_to_github(repo_name, github_username, github_token):
             subprocess.run(["git", "remote", "set-url", "origin", safe_remote_url], check=True)
         else:
             subprocess.run(["git", "remote", "add", "origin", safe_remote_url], check=True)
-            
+
         # 2. Ensure we are on 'main'
         subprocess.run(["git", "branch", "-M", "main"], check=True)
-        
+
         # 3. Perform push using the authenticated URL (not saved to config)
         print_info("Pushing to GitHub (Authenticated Session)...")
-        # We use the auth_remote_url directly in the push command
-        subprocess.run(["git", "push", "-u", "--force", auth_remote_url, "main"], check=True, capture_output=True)
+        print_info("Press Ctrl+C to cancel")
         
+        # We use the auth_remote_url directly in the push command
+        push_result = subprocess.run(["git", "push", "-u", "--force", auth_remote_url, "main"], check=True, capture_output=True)
+
         print_success("Pushed to GitHub successfully.")
         return True, "Pushed to GitHub successfully."
     except subprocess.CalledProcessError as e:
-        return False, f"Push failed: {e.stderr.strip() if e.stderr else str(e)}"
+        error_msg = e.stderr.strip() if e.stderr else str(e)
+        if "Authentication failed" in error_msg:
+            print_error("Authentication failed. Please check your GitHub token.")
+            print_info("Run Option 14 to reconfigure your credentials.")
+        elif "remote: Repository not found" in error_msg:
+            print_error("Repository not found. Please check the repository name.")
+        elif "Could not resolve host" in error_msg:
+            print_error("Network error. Please check your internet connection.")
+        else:
+            print_error(f"Push failed: {error_msg}")
+        return False, f"Push failed: {error_msg}"
+    except KeyboardInterrupt:
+        print_info("\n⚠️  Push cancelled by user")
+        return False, "Push cancelled"
 
 def upload_project_directory(github_username, github_token, config, args=None):
     """Handles the entire process of uploading/updating a project directory."""
@@ -126,23 +173,45 @@ def upload_project_directory(github_username, github_token, config, args=None):
         return
 
     print_header("Upload Project Directory")
-    project_path, repo_name, repo_description, is_private = get_project_directory_input(config, args)
+    print_info("This will initialize a git repo, create a GitHub repository, and push all files")
+    print_info("Press Ctrl+C at any time to cancel")
     
+    project_path, repo_name, repo_description, is_private = get_project_directory_input(config, args)
+
     # Input Validation
     is_valid_path, path_err = validate_file_path(project_path)
     if not is_valid_path:
         print_error(f"Error: {path_err}")
+        print_info("Hint: Make sure the path exists and is readable")
         return
 
     is_valid_repo, repo_err = validate_repo_name(repo_name)
     if not is_valid_repo:
         print_error(f"Error: {repo_err}")
+        print_info("Hint: Repository names can only contain letters, numbers, hyphens, underscores, and periods")
+        print_info("Example: my-project or my_project")
         return
 
     # Run security scan on the directory
     if not scan_directory_for_sensitive_files(project_path):
         print_warning("Upload cancelled due to security check.")
         return False
+
+    # Calculate estimated migration time
+    try:
+        total_size_bytes = 0
+        file_count = 0
+        for root, _, filenames in os.walk(project_path):
+            if '.git' not in root:
+                file_count += len(filenames)
+                for f in filenames:
+                    total_size_bytes += os.path.getsize(os.path.join(root, f))
+        
+        size_mb = total_size_bytes / (1024 * 1024)
+        est_time = estimate_repo_operation_time(size_mb, 'upload')
+        print_info(f"📁 Analysis: {file_count} files | {size_mb:.1f} MB")
+        print_info(f"⏳ Estimated migration time: {est_time}")
+    except Exception: pass
 
     success, msg = initialize_git_repository(project_path)
     if not success:
@@ -262,6 +331,8 @@ def upload_single_file(github_username, github_token, config, args=None):
     is_valid_repo, repo_err = validate_repo_name(repo_name)
     if not is_valid_repo:
         print_error(f"Error: {repo_err}")
+        print_info("Hint: Repository names can only contain letters, numbers, hyphens, underscores, and periods")
+        print_info("Example: my-project or my_project")
         return False
 
     if check_is_sensitive(local_file_path):
@@ -512,9 +583,9 @@ import tempfile
 def migrate_repository(github_username, github_token, config, args=None):
     """Mirror a repository from any source to GitHub with full history."""
     print_header("Repository Migration Tool")
-    
+
     src_url = args.url if args and hasattr(args, 'url') and args.url else input("🔗 Enter Source Repository URL (GitLab/Bitbucket/etc): ")
-    
+
     # Security: Validate Source URL
     try:
         validate_git_url(src_url)
@@ -522,37 +593,65 @@ def migrate_repository(github_username, github_token, config, args=None):
         print_error(str(e))
         return
 
+    # Verify source repository is accessible BEFORE proceeding
+    print_info("Verifying source repository accessibility...")
+    try:
+        result = subprocess.run(["git", "ls-remote", src_url], capture_output=True, text=True, timeout=30)
+        if result.returncode != 0:
+            print_error(f"Cannot access source repository: {result.stderr.strip()}")
+            print_info("Check URL and credentials")
+            return
+        # Count refs to verify it's a valid repo
+        ref_count = len(result.stdout.strip().split('\n'))
+        print_success(f"Source verified: {ref_count} refs found")
+        
+        # Estimate size from refs (rough estimate)
+        estimated_size_mb = ref_count * 0.1  # Very rough estimate
+        print_info(f"Estimated repository size: ~{estimated_size_mb:.1f} MB")
+        print_info(f"Estimated migration time: {estimate_repo_operation_time(estimated_size_mb, 'migrate')}")
+    except subprocess.TimeoutExpired:
+        print_warning("Source verification timed out (large repo?)")
+        confirm = input("Proceed anyway? (y/n): ").strip().lower()
+        if confirm != 'y':
+            return
+    except Exception as e:
+        print_error(f"Source verification failed: {e}")
+        return
+
     dest_name = args.repo if args and hasattr(args, 'repo') and args.repo else input("📦 Enter Destination GitHub Repository Name: ")
-    
+
     is_private = args.private if args and hasattr(args, 'private') else input("🔒 Make destination private? (y/n) [y]: ").lower() != 'n'
 
     print_info(f"Establishing destination on GitHub...")
     # Ensure dest exists
     create_or_get_github_repository(dest_name, f"Mirrored from {src_url}", is_private, github_username, github_token)
-    
+
     # Authenticated URL for the single push operation
     auth_dest_url = f"https://{github_token}@github.com/{github_username}/{dest_name}.git"
-    
+
     # Use a temporary directory for the mirror operation
     temp_dir = tempfile.mkdtemp()
     try:
         print_info("Performing mirror clone (this may take time for large repos)...")
+        print_info("Press Ctrl+C at any time to cancel")
+        
         # Direct arguments to avoid shell=True risk
-        subprocess.run(["git", "clone", "--mirror", src_url, temp_dir], check=True, capture_output=True)
+        clone_result = subprocess.run(["git", "clone", "--mirror", src_url, temp_dir], check=True, capture_output=True)
         
         # Change to the temporary directory
         current_dir = os.getcwd()
         os.chdir(temp_dir)
-        
+
         print_info("Pushing mirror to GitHub (Authenticated Session)...")
-        # We push to the auth_dest_url but the origin URL in the clone remains clean
-        subprocess.run(["git", "push", "--mirror", auth_dest_url], check=True, capture_output=True)
-        
+        push_result = subprocess.run(["git", "push", "--mirror", auth_dest_url], check=True, capture_output=True)
+
         os.chdir(current_dir)
         print_success(f"\nMigration Successful! 🚀")
         print_info(f"View it at: https://github.com/{github_username}/{dest_name}")
     except subprocess.CalledProcessError as e:
         print_error(f"Migration failed during git operation: {e.stderr if e.stderr else e}")
+    except KeyboardInterrupt:
+        print_info("\n⚠️  Migration cancelled by user. Cleaning up...")
     finally:
         # Cleanup
         shutil.rmtree(temp_dir, ignore_errors=True)

@@ -502,6 +502,20 @@ class TokenRotationManager:
         
         # Step 5: Update configuration
         print_info("\nStep 4: Updating configuration...")
+        
+        # Token Revocation Checklist
+        print_header("🔒 SECURITY CHECKLIST")
+        print_warning("Before completing rotation, confirm the following:")
+        print("")
+        print("□ I have saved the new token securely")
+        print("□ I will revoke the OLD token immediately after this rotation")
+        print("□ I have updated CI/CD pipelines with the new token")
+        print("□ I have updated any scripts/tools using the old token")
+        print("")
+        checklist = input("Type 'CONFIRM' to acknowledge: ").strip()
+        if checklist != 'CONFIRM':
+            return False, "Security checklist not confirmed"
+        
         try:
             from ..core.config import configuration_wizard, load_config, get_active_profile_path
             

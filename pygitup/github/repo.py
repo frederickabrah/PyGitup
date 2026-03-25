@@ -1,5 +1,5 @@
 
-import inquirer
+import questionary
 from .api import update_repo_visibility, delete_repo_api
 from ..utils.ui import print_success, print_error, print_info, print_header, print_warning
 
@@ -19,25 +19,20 @@ def manage_repo_visibility(args, github_username, github_token):
         print_header("Repository Visibility")
         questions = []
         if not repo_name:
-            questions.append(inquirer.Text("repo", message="Enter the repository name"))
+            repo_name = questionary.text("Enter the repository name").ask()
+            if not repo_name: # Handle cancellation
+                print_info("Operation cancelled.")
+                return
         
         if target_private is None:
-            questions.append(inquirer.List(
-                "visibility",
-                message="Select new visibility",
+            visibility = questionary.select(
+                "Select new visibility",
                 choices=["Private", "Public"],
-            ))
-            
-        answers = inquirer.prompt(questions)
-        if not answers:
-            print_info("Operation cancelled.")
-            return
-        
-        if not repo_name:
-            repo_name = answers["repo"]
-        
-        if target_private is None:
-            target_private = answers["visibility"] == "Private"
+            ).ask()
+            if visibility is None: # Handle cancellation
+                print_info("Operation cancelled.")
+                return
+            target_private = visibility == "Private"
 
     if not repo_name:
         print_error("Repository name is required.")
@@ -68,28 +63,43 @@ def delete_repository(args, github_username, github_token):
 
     if not repo_name:
         print_header("Delete Repository")
-        questions = [inquirer.Text("repo", message="Enter the name of the repository to DELETE")]
-        answers = inquirer.prompt(questions)
-        if not answers:
+        repo_name = questionary.text("Enter the name of the repository to DELETE:").ask()
+        if not repo_name: # Handle cancellation
             print_info("Operation cancelled.")
             return
-        repo_name = answers["repo"]
 
     if not repo_name:
         print_error("Repository name is required.")
         return
 
-    print("\n" + "!" * 50)
-    print_error(f"DANGER: You are about to PERMANENTLY DELETE '{repo_name}'")
-    print("!" * 50 + "\n")
+    # Professional Danger Warning
+    from rich.panel import Panel
+    from rich.text import Text
+    from ..utils.ui import console
     
-    confirmation = input(f"To confirm, type '{repo_name}': ")
+    warning_text = Text.assemble(
+        ("DANGER: ", "bold red"),
+        (f"You are about to PERMANENTLY DELETE repository '", "white"),
+        (f"{repo_name}", "bold yellow"),
+        ("'", "white")
+    )
+    console.print(Panel(warning_text, border_style="red", title="⚠️  CRITICAL ACTION"))
+    print_warning("This operation is irreversible and will remove all code, issues, and history.")
     
-    if confirmation != repo_name:
-        print_warning("Verification failed. Repository deletion cancelled.")
+    print("\nStep 1: Security Verification")
+    confirm_name = input(f"Type the repository name to confirm ('{repo_name}'): ").strip()
+    
+    if confirm_name != repo_name:
+        print_info("Verification failed. Deletion cancelled.")
+        return
+    
+    print("\nStep 2: Final Authorization")
+    final = input("Type 'CONFIRM DELETE' to finalize: ").strip()
+    if final != 'CONFIRM DELETE':
+        print_info("Authorization aborted. Repository remains safe.")
         return
 
-    print_info(f"Deleting repository '{repo_name}'...")
+    print_info(f"Initiating technical deletion of '{repo_name}'...")
     
     try:
         response = delete_repo_api(github_username, repo_name, github_token)
@@ -102,3 +112,4 @@ def delete_repository(args, github_username, github_token):
             
     except Exception as e:
         print_error(f"An error occurred: {e}")
+

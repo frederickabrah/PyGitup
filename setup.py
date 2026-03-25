@@ -10,7 +10,7 @@ setup(
         'PyYAML',
         'tqdm',
         'pip-audit',
-        'inquirer',
+        'questionary', # Replaced inquirer with questionary
         'rich',
         'textual',
         'beautifulsoup4',

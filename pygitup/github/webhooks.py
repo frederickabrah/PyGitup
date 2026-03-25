@@ -1,4 +1,4 @@
-import inquirer
+import questionary
 from .api import github_request
 from ..utils.ui import print_success, print_error, print_info, print_header
 
@@ -12,34 +12,34 @@ def manage_webhooks(args, github_username, github_token):
 
     if not action:
         print_header("Webhook Management")
-        questions = [
-            inquirer.List(
-                "action",
-                message="What webhook operation would you like to perform?",
-                choices=["list", "create", "delete"],
-            )
-        ]
-        answers = inquirer.prompt(questions)
-        action = answers["action"]
+        action = questionary.select(
+            "What webhook operation would you like to perform?",
+            choices=["list", "create", "delete"]
+        ).ask()
+        
+        if not action:
+            print_info("Operation cancelled.")
+            return
 
         if not repo_name:
-            repo_questions = [inquirer.Text("repo", message="Enter the repository name")]
-            repo_answers = inquirer.prompt(repo_questions)
-            repo_name = repo_answers["repo"]
+            repo_name = questionary.text("Enter the repository name:").ask()
+            if not repo_name:
+                print_info("Operation cancelled.")
+                return
 
         if action == "create":
-            webhook_questions = [
-                inquirer.Text("url", message="Enter the webhook URL"),
-                inquirer.Text("events", message="Enter events to subscribe to (comma-separated)", default="push"),
-            ]
-            webhook_answers = inquirer.prompt(webhook_questions)
-            url = webhook_answers["url"]
-            events = [e.strip() for e in webhook_answers["events"].split(",")]
+            url = questionary.text("Enter the webhook URL:").ask()
+            events_str = questionary.text("Enter events to subscribe to (comma-separated):", default="push").ask()
+            if not url or not events_str:
+                print_info("Operation cancelled.")
+                return
+            events = [e.strip() for e in events_str.split(",")]
 
         elif action == "delete":
-            hook_id_questions = [inquirer.Text("hook_id", message="Enter the ID of the webhook to delete")]
-            hook_id_answers = inquirer.prompt(hook_id_questions)
-            hook_id = hook_id_answers["hook_id"]
+            hook_id = questionary.text("Enter the ID of the webhook to delete:").ask()
+            if not hook_id:
+                print_info("Operation cancelled.")
+                return
 
     if not repo_name:
         print_error("Repository name is required for webhook operations.")
