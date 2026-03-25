@@ -163,3 +163,20 @@ REMAINING_UX_ISSUES.md
 TIME_ESTIMATES_FEATURE.md
 TUI_AGENT_FIXES.md
 UX_AUDIT_REPORT.md
+FEATURE_AUDIT_REPORT.md
+RELEASE_NOTES_v*.md
+
+# AI/Agent development files
+*AGENT*.md
+*AUDIT*.md
+*_STATUS.md
+*_PROGRESS.md
+*_BUGS.md
+*_FIXES.md
+*_PLAN.md
+
+# Working documents
+*.log
+*.bak
+*~
+cleanup_history.sh
