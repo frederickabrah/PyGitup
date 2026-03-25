@@ -532,9 +532,73 @@ def get_project_info(directory="."):
         except:
             pass
     
+    # Try to get from package.json (Node.js)
+    package_json_path = os.path.join(directory, "package.json")
+    if os.path.exists(package_json_path):
+        try:
+            with open(package_json_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                name = data.get('name', '')
+                version = data.get('version', '0.0.0')
+                if name:
+                    return name, version
+        except:
+            pass
+    
+    # Try to get from Cargo.toml (Rust)
+    cargo_path = os.path.join(directory, "Cargo.toml")
+    if os.path.exists(cargo_path):
+        try:
+            with open(cargo_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                name_match = re.search(r'name\s*=\s*"([^"]+)"', content)
+                version_match = re.search(r'version\s*=\s*"([^"]+)"', content)
+                if name_match and version_match:
+                    return name_match.group(1), version_match.group(1)
+        except:
+            pass
+    
     # Fallback to directory name
     dir_name = os.path.basename(os.path.abspath(directory))
     return dir_name, "0.0.0"
+
+
+def detect_project_languages(directory="."):
+    """Detect programming languages used in the project."""
+    languages = []
+    
+    # Check for Python
+    if os.path.exists(os.path.join(directory, "requirements.txt")) or \
+       os.path.exists(os.path.join(directory, "setup.py")) or \
+       os.path.exists(os.path.join(directory, "pyproject.toml")):
+        languages.append("Python")
+    
+    # Check for Node.js/JavaScript
+    if os.path.exists(os.path.join(directory, "package.json")):
+        languages.append("Node.js")
+    
+    # Check for Rust
+    if os.path.exists(os.path.join(directory, "Cargo.toml")):
+        languages.append("Rust")
+    
+    # Check for Go
+    if os.path.exists(os.path.join(directory, "go.mod")):
+        languages.append("Go")
+    
+    # Check for Java/Kotlin
+    if os.path.exists(os.path.join(directory, "pom.xml")) or \
+       os.path.exists(os.path.join(directory, "build.gradle")):
+        languages.append("Java")
+    
+    # Check for Ruby
+    if os.path.exists(os.path.join(directory, "Gemfile")):
+        languages.append("Ruby")
+    
+    # Check for PHP
+    if os.path.exists(os.path.join(directory, "composer.json")):
+        languages.append("PHP")
+    
+    return languages
 
 
 def generate_sbom_spdx(output_file: str = "sbom.spdx.json", directory: str = ".") -> str:
@@ -553,7 +617,11 @@ def generate_sbom_spdx(output_file: str = "sbom.spdx.json", directory: str = "."
     # Get actual project info
     project_name, project_version = get_project_info(directory)
     print_info(f"   Project: {project_name} v{project_version}")
-
+    
+    # Detect languages
+    languages = detect_project_languages(directory)
+    print_info(f"   Detected languages: {', '.join(languages) if languages else 'Unknown'}")
+    
     # Parse requirements from the project directory
     old_cwd = os.getcwd()
     try:
@@ -566,9 +634,18 @@ def generate_sbom_spdx(output_file: str = "sbom.spdx.json", directory: str = "."
             filtered_packages = {k: v for k, v in packages.items() if k in requirements}
             if filtered_packages:
                 packages = filtered_packages
-                print_info(f"   Found {len(packages)} dependencies from requirements")
+                print_info(f"   Found {len(packages)} Python dependencies from requirements")
+        else:
+            print_warning("   No requirements.txt found - scanning all installed packages")
     finally:
         os.chdir(old_cwd)
+    
+    # Add language support note
+    if len(languages) > 1 or (languages and languages[0] != "Python"):
+        print_warning("   ⚠️  Note: SBOM currently supports Python packages only")
+        print_info("   For multi-language projects, consider using:")
+        print_info("     - CycloneDX CLI (supports JS, Java, .NET, etc.)")
+        print_info("     - SPDX SBOM tools")
     
     # SPDX document structure
     spdx_doc = {

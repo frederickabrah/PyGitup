@@ -366,7 +366,12 @@ def upload_single_file(github_username, github_token, config, args=None):
     response = get_file_info(github_username, repo_name, repo_file_path, github_token)
     if response.status_code == 200:
         print_info("File exists in the repository. It will be overwritten.")
-        sha = response.json()['sha']
+        try:
+            file_data = response.json()
+            sha = file_data.get('sha') if isinstance(file_data, dict) else None
+        except Exception as e:
+            print_warning(f"Could not get file SHA: {e}")
+            sha = None
     elif response.status_code != 404:
         print_error(f"Error checking for file: {response.status_code} - {response.text}")
         if not args or not args.batch:
@@ -383,7 +388,16 @@ def upload_single_file(github_username, github_token, config, args=None):
         if not args or not args.batch:
             sys.exit(1)
         return False
-    print_info(f"View the file at: {response.json()['content']['html_url']}")
+    
+    # Show file URL if available
+    try:
+        response_data = response.json()
+        if isinstance(response_data, dict) and 'content' in response_data:
+            html_url = response_data['content'].get('html_url', 'N/A')
+            print_info(f"View the file at: {html_url}")
+    except:
+        pass
+    
     return True
 
 def get_batch_files_input(config, args=None):
