@@ -543,20 +543,33 @@ def main():
                 show_remediation_help()
             elif mode == "manual":
                 print_header("PyGitUp User Manual")
-                manual_path = os.path.join(os.path.dirname(__file__), "..", "..", "USER_MANUAL.md")
-                if os.path.exists(manual_path):
-                    print_info(f"Opening manual at: {manual_path}")
-                    print("\n📘 Full manual available at: USER_MANUAL.md")
-                    print("\nQuick Reference:")
-                    print("  • Core: Options 1-4 (Upload/Create)")
-                    print("  • Git: Options 15-18 (Branch/Stash/Tag)")
-                    print("  • GitHub: Options 19-22, 24-29")
-                    print("  • Security: Options 23, 35-39, 41-45")
-                    print("  • AI: Options 30-32, 40")
-                    print("\n💡 Tip: Use Option H for feature-specific help")
-                    print("📖 Full manual: USER_MANUAL.md")
-                else:
-                    print_error("Manual not found. See: https://github.com/frederickabrah/PyGitUp/wiki")
+                # Try multiple paths to find the manual
+                manual_paths = [
+                    os.path.join(os.path.dirname(os.path.dirname(__file__)), "USER_MANUAL.md"),
+                    os.path.join(os.getcwd(), "USER_MANUAL.md"),
+                    "USER_MANUAL.md"
+                ]
+                manual_found = False
+                for manual_path in manual_paths:
+                    if os.path.exists(manual_path):
+                        manual_found = True
+                        print_success(f"Manual found at: {manual_path}")
+                        print("\n📘 Full manual available at: USER_MANUAL.md")
+                        print("\nQuick Reference:")
+                        print("  • Core: Options 1-4 (Upload/Create)")
+                        print("  • Git: Options 15-18 (Branch/Stash/Tag)")
+                        print("  • GitHub: Options 19-22, 24-29")
+                        print("  • Security: Options 23, 35-39, 41-45")
+                        print("  • AI: Options 30-32, 40")
+                        print("\n💡 Tip: Use Option H for feature-specific help")
+                        print("📖 Full manual: USER_MANUAL.md")
+                        print("\nTo view the manual:")
+                        print(f"  cat {manual_path}")
+                        break
+                
+                if not manual_found:
+                    print_error("Manual file not found in current directory")
+                    print_info("See: https://github.com/frederickabrah/PyGitUp/wiki")
             elif mode == "help":
                 # Show help for a specific feature
                 print_header("Feature Help")
