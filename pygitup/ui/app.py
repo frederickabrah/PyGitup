@@ -374,6 +374,7 @@ class PyGitUpTUI(App):
 
     def on_mount(self) -> None:
         self.query_one("#feature-list").focus()
+        self.title = self.TITLE
         self.query_one("#security-table", DataTable).add_columns("Type", "File", "Context")
         self.query_one("#gist-table", DataTable).add_columns("Filename", "Description", "Visibility", "URL")
         self.query_one("#pr-table", DataTable).add_columns("Number", "Title", "From", "Into")
@@ -486,7 +487,6 @@ class PyGitUpTUI(App):
             self.query_one("#status-bar").update("[bold]🔌 OFFLINE[/bold] | Actions will be queued")
             self.query_one("#status-bar").set_classes("offline")
 
-<<<<<<< HEAD
     def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
         if event.list_view.id == "feature-list" and event.item and isinstance(event.item, FeatureItem):
             if self.query_one("#main-switcher").current == "home-view":
@@ -540,7 +540,7 @@ class PyGitUpTUI(App):
             else:
                 self.notify(msg, severity="error")
 
-    def run_mentor_view(self): 
+    def run_mentor_view(self):
         self.query_one("#main-switcher").current = "mentor-view"
         self.query_one("#chat-input").focus()
         if not self.chat_history:
@@ -551,9 +551,6 @@ class PyGitUpTUI(App):
 
     def run_project_view(self):
         self.query_one("#main-switcher").current = "project-view"
-=======
-        def on_mount(self) -> None:
->>>>>>> 7506721 (Fix: Ensure TUI feature list is focused on mount and handle click/enter selection events correctly)
 
     def run_osint_view(self):
         self.query_one("#main-switcher").current = "osint-view"
@@ -563,29 +560,25 @@ class PyGitUpTUI(App):
         self.query_one("#main-switcher").current = "analytics-view"
         self.run_worker(self.fetch_analytics_task())
 
-<<<<<<< HEAD
     def run_security_view(self):
         self.query_one("#main-switcher").current = "security-view"
-    
+
     def run_identity_view(self):
         self.query_one("#main-switcher").current = "identity-view"
         p_list = self.query_one("#profile-list", ListView)
         p_list.clear()
         for p in list_profiles():
             p_list.append(ListItem(Label(f"🔑 {p}")))
-    
+
     def run_marketplace_view(self):
         self.query_one("#main-switcher").current = "marketplace-view"
 
     def run_release_view(self):
         self.query_one("#main-switcher").current = "release-view"
-=======
-            self.title = self.TITLE
->>>>>>> 7506721 (Fix: Ensure TUI feature list is focused on mount and handle click/enter selection events correctly)
 
     def run_gist_view(self):
         self.query_one("#main-switcher").current = "gist-view"
-    
+
     def run_ssh_view(self):
         self.query_one("#main-switcher").current = "ssh-view"
         key_path = os.path.expanduser("~/.ssh/pygitup_id_rsa.pub")
@@ -597,7 +590,6 @@ class PyGitUpTUI(App):
     def run_docs_view(self):
         self.query_one("#main-switcher").current = "docs-view"
 
-<<<<<<< HEAD
     def run_pr_view(self):
         self.query_one("#main-switcher").current = "pr-view"
         self.run_worker(self.list_prs_task())
@@ -625,94 +617,6 @@ class PyGitUpTUI(App):
         if event.input.id == "target-dir-input":
             self.switch_context()
             return
-=======
-            # Auto-focus the list so keys work immediately
-
-
-
-            self.query_one("#feature-list").focus()
-
-
-
-    
-
-
-
-        def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
-
-
-
-            if event.item:
-
-
-
-                item = event.item
-
-
-
-                self.query_one("#feature-title").update(f"🚀 {item.feature_name}")
-
-
-
-                self.query_one("#feature-desc").update(f"{item.description}\n\n[bold white]Press ENTER to launch.[/bold white]")
-
-
-
-    
-
-
-
-        def on_list_view_selected(self, event: ListView.Selected) -> None:
-
-
-
-            """Handles both Enter key and Mouse Click selection."""
-
-
-
-            if event.item:
-
-
-
-                self.launch_feature(event.item.mode)
-
-
-
-    
-
-
-
-        def action_refresh(self) -> None:
-
-
-
-            self.notify("System Status: Online 🟢")
-
-
-
-    
-
-
-
-        def action_select(self) -> None:
-
-
-
-            # Fallback manual trigger if needed
-
-
-
-            list_view = self.query_one("#feature-list", ListView)
-
-
-
-            if list_view.highlighted_child:
-
-
-
-                self.launch_feature(list_view.highlighted_child.mode)
->>>>>>> 7506721 (Fix: Ensure TUI feature list is focused on mount and handle click/enter selection events correctly)
-
         if event.input.id == "chat-input":
             query = event.value
             event.input.value = ""
