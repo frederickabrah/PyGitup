@@ -208,11 +208,11 @@ def run_audit(github_username=None, repo_name=None, github_token=None):
             # User wants to scan a different repo
             print_info(f"📁 You entered repo name: {repo_name}")
             print_info(f"   Current directory: {current_dir}")
-            print_warning("⚠️  Cannot scan remote repo without cloning")
-            print_info("Choose an option:")
-            print(f"  1: Scan CURRENT directory instead (fast)")
-            print(f"  2: Clone '{repo_name}' and scan (slow, ~5min)")
-            print("  3: Cancel")
+            print_info("\nChoose a scanning method:")
+            print(f"  1: Scan CURRENT directory (fast, local analysis)")
+            print(f"  2: Clone '{repo_name}' & scan (slow, ~5min, thorough)")
+            print(f"  3: GitHub Security Alerts (instant, needs API access)")
+            print("  4: Cancel")
             choice = input("\n👉 Choice [1]: ").strip() or "1"
             
             if choice == "1":
@@ -235,35 +235,46 @@ def run_audit(github_username=None, repo_name=None, github_token=None):
                     print_error(f"Clone failed: {e}")
                     print_info("Falling back to current directory scan")
                     temp_dir = None
+            elif choice == "3":
+                # Use GitHub Security API - no cloning needed!
+                print_info(f"Fetching GitHub Security Alerts for {repo_name}...")
+                print_info("This will show:")
+                print("  • Dependabot alerts (vulnerable dependencies)")
+                print("  • Secret scanning alerts (leaked credentials)")
+                print("  • Code scanning alerts (SAST findings)")
+                # Skip local scan, go straight to GitHub API
+                scan_local = False
             else:
                 print_info("Audit cancelled")
                 return
     
-    # 1. Local SAST
-    print_info("\n🔍 Running local AST-based security scan...")
-    run_local_sast_scan(".")
-    
-    # Cleanup temp directory if we cloned
-    if 'temp_dir' in locals() and temp_dir:
-        print_info(f"\n🧹 Cleaning up temporary directory...")
-        import shutil
-        shutil.rmtree(temp_dir, ignore_errors=True)
-        os.chdir(old_dir if 'old_dir' in locals() else os.getcwd())
-    
-    # 2. Local pip-audit
-    print_info("\nChecking dependencies for known vulnerabilities...")
-    try:
-        result = subprocess.run(["pip-audit"], capture_output=True, text=True)
-        if result.returncode == 0:
-            print_success("No known local vulnerabilities found via pip-audit.")
-        else:
-            print_warning("Local vulnerabilities detected:")
-            print(result.stdout)
-    except FileNotFoundError:
-        print_warning("'pip-audit' not found. Skipping local dependency scan.")
+    # 1. Local SAST (only if user chose local scan)
+    if scan_local:
+        print_info("\n🔍 Running local AST-based security scan...")
+        run_local_sast_scan(".")
 
-    # 3. Remote GitHub Security scan
+        # Cleanup temp directory if we cloned
+        if 'temp_dir' in locals() and temp_dir:
+            print_info(f"\n🧹 Cleaning up temporary directory...")
+            import shutil
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            os.chdir(old_dir if 'old_dir' in locals() else os.getcwd())
+
+        # 2. Local pip-audit
+        print_info("\nChecking dependencies for known vulnerabilities...")
+        try:
+            result = subprocess.run(["pip-audit"], capture_output=True, text=True)
+            if result.returncode == 0:
+                print_success("No known local vulnerabilities found via pip-audit.")
+            else:
+                print_warning("Local vulnerabilities detected:")
+                print(result.stdout)
+        except FileNotFoundError:
+            print_warning("'pip-audit' not found. Skipping local dependency scan.")
+    
+    # 3. Remote GitHub Security scan (always runs if you have token)
     if github_username and repo_name and github_token:
+        print_info("\n🌐 Fetching GitHub Security Alerts...")
         run_advanced_security_scan(github_username, repo_name, github_token)
 
 def run_advanced_security_scan(username, repo_name, token):
