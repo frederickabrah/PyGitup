@@ -191,8 +191,64 @@ def run_audit(github_username=None, repo_name=None, github_token=None):
     """Run a comprehensive security audit (Local AST + Remote Scan)."""
     print_header("Security Audit")
     
+    # Check if we should scan local or remote
+    scan_local = True
+    scan_remote = False
+    
+    if github_username and repo_name and github_token:
+        # Check if repo_name matches current directory name
+        import os
+        current_dir = os.path.basename(os.getcwd())
+        
+        if repo_name.lower() == current_dir.lower():
+            # User wants to scan current directory - be honest
+            print_info(f"📁 Scanning CURRENT directory: {current_dir}")
+            print_info(f"   Repository name: {repo_name}")
+        else:
+            # User wants to scan a different repo
+            print_info(f"📁 You entered repo name: {repo_name}")
+            print_info(f"   Current directory: {current_dir}")
+            print_warning("⚠️  Cannot scan remote repo without cloning")
+            print_info("Choose an option:")
+            print(f"  1: Scan CURRENT directory instead (fast)")
+            print(f"  2: Clone '{repo_name}' and scan (slow, ~5min)")
+            print("  3: Cancel")
+            choice = input("\n👉 Choice [1]: ").strip() or "1"
+            
+            if choice == "1":
+                print_info(f"Scanning current directory: {current_dir}")
+            elif choice == "2":
+                print_info(f"Cloning {repo_name}...")
+                import tempfile
+                import shutil
+                temp_dir = tempfile.mkdtemp()
+                try:
+                    subprocess.run(
+                        ["git", "clone", f"https://github.com/{github_username}/{repo_name}.git", temp_dir],
+                        check=True, capture_output=True
+                    )
+                    old_dir = os.getcwd()
+                    os.chdir(temp_dir)
+                    print_info(f"Cloned to {temp_dir}")
+                    scan_local = True
+                except Exception as e:
+                    print_error(f"Clone failed: {e}")
+                    print_info("Falling back to current directory scan")
+                    temp_dir = None
+            else:
+                print_info("Audit cancelled")
+                return
+    
     # 1. Local SAST
+    print_info("\n🔍 Running local AST-based security scan...")
     run_local_sast_scan(".")
+    
+    # Cleanup temp directory if we cloned
+    if 'temp_dir' in locals() and temp_dir:
+        print_info(f"\n🧹 Cleaning up temporary directory...")
+        import shutil
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        os.chdir(old_dir if 'old_dir' in locals() else os.getcwd())
     
     # 2. Local pip-audit
     print_info("\nChecking dependencies for known vulnerabilities...")
