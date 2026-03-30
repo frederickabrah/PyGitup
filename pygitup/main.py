@@ -150,7 +150,30 @@ def main():
         # Parse command line arguments
         parser = create_parser()
         args = parser.parse_args()
+
+        # Handle manual/help modes immediately - no config needed
+        if args.mode == "manual":
+            print_header("PyGitUp User Manual")
+            manual_path = "USER_MANUAL.md"
+            if os.path.exists(manual_path):
+                print_success(f"Manual found at: {manual_path}")
+                print("\n📘 Full manual available at: USER_MANUAL.md")
+                print("\nQuick Reference:")
+                print("  • Core: Options 1-4 (Upload/Create)")
+                print("  • Git: Options 15-18 (Branch/Stash/Tag)")
+                print("  • GitHub: Options 19-22, 24-29")
+                print("  • Security: Options 23, 35-39, 41-45")
+                print("  • AI: Options 30-32, 40")
+                print("\n💡 Tip: Use Option H for feature-specific help")
+                print("📖 Full manual: USER_MANUAL.md")
+            else:
+                print_error("Manual file not found")
+            sys.exit(0)
         
+        if args.mode == "help":
+            show_help_for_mode("")
+            sys.exit(0)
+
         # Load configuration
         config = load_config(args.config)
 
@@ -204,10 +227,33 @@ def main():
         # Process offline queue if not in queue processing mode
         if args.mode != "process-queue":
             process_offline_queue(github_username, github_token, config)
+
+        # Handle manual/help modes - exit early, no credentials needed
+        if args.mode == "manual":
+            print_header("PyGitUp User Manual")
+            manual_path = "USER_MANUAL.md"
+            if os.path.exists(manual_path):
+                print_success(f"Manual found at: {manual_path}")
+                print("\n📘 Full manual available at: USER_MANUAL.md")
+                print("\nQuick Reference:")
+                print("  • Core: Options 1-4 (Upload/Create)")
+                print("  • Git: Options 15-18 (Branch/Stash/Tag)")
+                print("  • GitHub: Options 19-22, 24-29")
+                print("  • Security: Options 23, 35-39, 41-45")
+                print("  • AI: Options 30-32, 40")
+                print("\n💡 Tip: Use Option H for feature-specific help")
+                print("📖 Full manual: USER_MANUAL.md")
+            else:
+                print_error("Manual file not found")
+            return
         
+        if args.mode == "help":
+            show_help_for_mode("")
+            return
+
         # Persistent loop for interactive mode
         is_interactive = not args.mode
-        
+
         while True:
             # Determine mode
             mode = args.mode

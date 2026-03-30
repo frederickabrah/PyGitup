@@ -13,20 +13,50 @@ from ..utils.ux_helpers import estimate_file_operation_time, estimate_repo_opera
 
 TQDM_AVAILABLE = True # Assume available for now
 
-def get_project_directory_input(config, args=None):
+def get_project_directory_input(config, args=None, github_username=None, github_token=None):
     """Gets user input for the project upload details."""
     if args and args.path:
         project_path = args.path
     else:
-        project_path = input("Enter the full path to your project directory: ")
+        # Default to current directory
+        project_path = input("Enter the full path to your project directory (or Enter for current): ").strip()
+        if not project_path:
+            project_path = os.getcwd()
+            print_info(f"Using current directory: {project_path}")
 
     if args and args.repo:
         repo_name = args.repo
     else:
         repo_name = input("Enter the desired name for your GitHub repository: ")
 
+    # Check if repo already exists BEFORE asking for description
+    repo_exists = False
+    existing_desc = None
+    existing_private = None
+    
+    if github_token and repo_name:
+        try:
+            from ..github.api import get_repo_info
+            response = get_repo_info(github_username, repo_name, github_token)
+            if response.status_code == 200:
+                repo_exists = True
+                existing_data = response.json()
+                existing_desc = existing_data.get('description', '')
+                existing_private = existing_data.get('private', False)
+                print_info(f"✅ Repository '{repo_name}' already exists on GitHub")
+                if existing_desc:
+                    print_info(f"   Current description: {existing_desc[:60]}")
+                print_info(f"   Visibility: {'Private' if existing_private else 'Public'}")
+                print_info("   → Will update existing repository (description preserved)")
+        except Exception as e:
+            pass  # If check fails, proceed as normal
+
     if args and args.description is not None:
         repo_description = args.description
+    elif repo_exists:
+        # Keep existing description
+        repo_description = existing_desc
+        print_info("   → Using existing description")
     else:
         default_desc = config["github"]["default_description"]
         repo_description = input(f"Enter a description for your repository (default: {default_desc}): ")
@@ -35,6 +65,10 @@ def get_project_directory_input(config, args=None):
 
     if args and args.private is not None:
         is_private = args.private
+    elif repo_exists:
+        # Keep existing visibility
+        is_private = existing_private
+        print_info("   → Keeping existing visibility")
     else:
         default_private = config["github"]["default_private"]
         is_private_input = input(f"Make the repository private? (y/n, default: {'y' if default_private else 'n'}): ").lower()
@@ -44,6 +78,8 @@ def get_project_directory_input(config, args=None):
             is_private = False
         else:
             is_private = default_private
+
+    return project_path, repo_name, repo_description, is_private
 
     # Check for common large folders that shouldn't be uploaded
     if os.path.isdir(project_path):
@@ -176,7 +212,7 @@ def upload_project_directory(github_username, github_token, config, args=None):
     print_info("This will initialize a git repo, create a GitHub repository, and push all files")
     print_info("Press Ctrl+C at any time to cancel")
     
-    project_path, repo_name, repo_description, is_private = get_project_directory_input(config, args)
+    project_path, repo_name, repo_description, is_private = get_project_directory_input(config, args, github_username, github_token)
 
     # Input Validation
     is_valid_path, path_err = validate_file_path(project_path)
