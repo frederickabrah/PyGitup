@@ -253,19 +253,9 @@ def upload_project_directory(github_username, github_token, config, args=None):
     if not success:
         print_error(msg)
         return False
-    
-    # Technical Upgrade: Automated SBOM Generation
-    print_info("📄 Generating Software Bill of Materials (SBOM)...")
-    try:
-        from ..utils.supply_chain import generate_sbom_spdx
-        sbom_path = os.path.join(project_path, "sbom.spdx.json")
-        generate_sbom_spdx(sbom_path)
-        subprocess.run(["git", "add", "sbom.spdx.json"], capture_output=True)
-        subprocess.run(["git", "commit", "-m", "docs: include automated SBOM manifest"], capture_output=True)
-        print_success("SBOM manifest integrated into repository.")
-    except Exception as e:
-        print_warning(f"SBOM generation skipped: {e}")
-        
+
+    # Removed automatic SBOM generation - users can use Option 38 manually if needed
+
     success, data_or_msg = create_or_get_github_repository(repo_name, repo_description, is_private, github_username, github_token)
     if not success:
         print_error(data_or_msg)
