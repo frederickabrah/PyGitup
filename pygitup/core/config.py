@@ -25,6 +25,10 @@ DEFAULT_CONFIG = {
         "token": "",
         "token_file": "",
         "ai_api_key": "",
+        "openai_api_key": "",
+        "anthropic_api_key": "",
+        "ollama_base_url": "",
+        "ai_provider": "gemini",
         "default_description": "Repository created with PyGitUp",
         "default_private": False
     },
@@ -191,6 +195,10 @@ def load_config(config_path=None):
                         salt = bytes.fromhex(salt_hex)
                         config["github"]["token"] = decrypt_data(config["github"].get("token"), salt)
                         config["github"]["ai_api_key"] = decrypt_data(config["github"].get("ai_api_key"), salt)
+                        config["github"]["openai_api_key"] = decrypt_data(config["github"].get("openai_api_key"), salt)
+                        config["github"]["anthropic_api_key"] = decrypt_data(config["github"].get("anthropic_api_key"), salt)
+                        # Ollama base URL is not sensitive usually, but we could encrypt it too
+                        config["github"]["ollama_base_url"] = decrypt_data(config["github"].get("ollama_base_url"), salt) or config["github"].get("ollama_base_url", "")
         except Exception as e: 
             print_warning(f"Could not load config: {e}")
     return config
@@ -250,7 +258,18 @@ def configuration_wizard(profile_name=None):
     except:
         pass
 
-    # 1. Set Master Password
+    # 1. AI Provider Selection
+    console.print("\n[bold]Select Default AI Provider:[/bold]")
+    console.print("  1: Google Gemini (Professional recommended)")
+    console.print("  2: OpenAI (GPT-4)")
+    console.print("  3: Anthropic (Claude 3.5)")
+    console.print("  4: Ollama (Local/Self-hosted)")
+    
+    prov_choice = input("\n👉 Choice [1]: ").strip() or "1"
+    providers = {"1": "gemini", "2": "openai", "3": "anthropic", "4": "ollama"}
+    config["github"]["ai_provider"] = providers.get(prov_choice, "gemini")
+
+    # 2. Set Master Password
     password = getpass.getpass("🔐 Set Master Password for this profile: ")
     confirm = getpass.getpass("🔐 Confirm Password: ")
     if password != confirm:
@@ -263,69 +282,43 @@ def configuration_wizard(profile_name=None):
     global _SESSION_KEY
     _SESSION_KEY = derive_key(password, salt)
 
-    config = copy.deepcopy(DEFAULT_CONFIG)
+    config_to_save = copy.deepcopy(DEFAULT_CONFIG)
+    config_to_save["github"]["ai_provider"] = config["github"]["ai_provider"]
+    
     if mode == "fill_missing" and existing_config:
         # Transfer existing non-sensitive config
         for section in existing_config:
-            if section in config and section != "security":
-                config[section].update(existing_config[section])
+            if section in config_to_save and section != "security":
+                config_to_save[section].update(existing_config[section])
 
-    # GitHub Username - show existing if available
-    if existing_username and mode != "overwrite":
-        print_info(f"Current GitHub Username: {existing_username}")
-        u = input(f"New GitHub Username [press Enter to keep current]: ").strip()
-        if u:
-            config["github"]["username"] = u
-        else:
-            config["github"]["username"] = existing_username
-    else:
-        u = input(f"GitHub Username: ").strip()
-        if u: config["github"]["username"] = u
+    # GitHub Username
+    u = input(f"GitHub Username: ").strip()
+    if u: config_to_save["github"]["username"] = u
+    elif mode == "fill_missing": config_to_save["github"]["username"] = existing_config.get("github", {}).get("username", "")
 
-    # GitHub Token - show if set
-    if existing_token_set and mode != "overwrite":
-        print_info("Current GitHub Token: [configured]")
-        t = getpass.getpass(f"New GitHub Token [press Enter to keep current]: ").strip()
-        if t:
-            config["github"]["token"] = t
-        else:
-            # Keep existing encrypted token
-            try:
-                with open(config_path, 'r') as f:
-                    existing_config_keep = yaml.safe_load(f) or {}
-                    config["github"]["token"] = existing_config_keep.get('github', {}).get('token', '')
-            except:
-                pass
-    else:
-        t = getpass.getpass(f"GitHub Token (Hidden): ").strip()
-        if t: config["github"]["token"] = t
+    # GitHub Token
+    t = getpass.getpass(f"GitHub Token (Hidden): ").strip()
+    if t: config_to_save["github"]["token"] = encrypt_data(t, salt)
+    elif mode == "fill_missing": config_to_save["github"]["token"] = existing_config.get("github", {}).get("token", "")
 
-    # AI API Key - show if set
-    if existing_ai_key_set and mode != "overwrite":
-        print_info("Current Gemini AI Key: [configured]")
-        a = getpass.getpass(f"New Gemini AI Key [press Enter to keep current]: ").strip()
-        if a:
-            config["github"]["ai_api_key"] = a
-        else:
-            # Keep existing encrypted AI key
-            try:
-                with open(config_path, 'r') as f:
-                    existing_config_keep = yaml.safe_load(f) or {}
-                    config["github"]["ai_api_key"] = existing_config_keep.get('github', {}).get('ai_api_key', '')
-            except:
-                pass
-    else:
+    # AI Keys based on selection
+    if config["github"]["ai_provider"] == "gemini":
         a = getpass.getpass(f"Gemini AI Key (Hidden): ").strip()
-        if a: config["github"]["ai_api_key"] = a
+        if a: config_to_save["github"]["ai_api_key"] = encrypt_data(a, salt)
+    elif config["github"]["ai_provider"] == "openai":
+        a = getpass.getpass(f"OpenAI API Key (Hidden): ").strip()
+        if a: config_to_save["github"]["openai_api_key"] = encrypt_data(a, salt)
+    elif config["github"]["ai_provider"] == "anthropic":
+        a = getpass.getpass(f"Anthropic API Key (Hidden): ").strip()
+        if a: config_to_save["github"]["anthropic_api_key"] = encrypt_data(a, salt)
+    elif config["github"]["ai_provider"] == "ollama":
+        a = input(f"Ollama Base URL [http://localhost:11434]: ").strip()
+        if a: config_to_save["github"]["ollama_base_url"] = a
 
     try:
-        save_config = copy.deepcopy(config)
-        save_config["security"] = {"salt": salt.hex()}
-        save_config["github"]["token"] = encrypt_data(config["github"]["token"], salt)
-        save_config["github"]["ai_api_key"] = encrypt_data(config["github"]["ai_api_key"], salt)
-
+        config_to_save["security"] = {"salt": salt.hex()}
         with open(config_path, "w") as f:
-            yaml.dump(save_config, f, default_flow_style=False)
+            yaml.dump(config_to_save, f, default_flow_style=False)
 
         if os.name != 'nt': os.chmod(config_path, 0o600)
         set_active_profile(profile_name)

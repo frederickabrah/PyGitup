@@ -18,6 +18,71 @@ from datetime import datetime
 from .ui import print_success, print_error, print_info, print_warning, print_header, Table, box, console
 
 
+def remediate_secrets_workflow(config=None):
+    """Workflow to scan for secrets and automatically offer remediation for each."""
+    print_header("🛡️ Automatic Secret Remediation")
+    
+    from .security_enhanced import run_comprehensive_security_scan
+    
+    print_info("Scanning codebase for secrets and vulnerabilities...")
+    findings = run_comprehensive_security_scan(".", include_deps=False)
+    
+    if not findings:
+        print_success("No security issues found. Everything looks clean!")
+        return True
+    
+    # Filter for remediable findings (secrets)
+    remediable = [f for f in findings if f.category == 'credential_leak']
+    
+    if not remediable:
+        print_info("Found vulnerabilities, but none are direct secret leaks that can be auto-purged.")
+        print_info("Please review the scan report for manual remediation.")
+        return True
+    
+    print_warning(f"Found {len(remediable)} staged or committed secrets!")
+    
+    for i, finding in enumerate(remediable, 1):
+        print_header(f"Remediation Task {i}/{len(remediable)}")
+        console.print(f"[bold red]Detected:[/bold red] {finding.title}")
+        console.print(f"[bold cyan]Location:[/bold cyan] {finding.file}:{finding.line}")
+        console.print(f"[bold yellow]Value:[/bold yellow] {finding.code}")
+        
+        print("\nChoose remediation method:")
+        print("1: Purge STRING from entire history (Recommended for multi-file/multi-commit)")
+        print("2: Purge FILE from entire history (Use if the whole file is sensitive)")
+        print("3: Undo last commit (Use if you JUST committed this)")
+        print("4: Skip this finding")
+        print("5: Abort all")
+        
+        choice = input("\n👉 Action [1]: ") or "1"
+        
+        if choice == '1':
+            # Extract the secret string if possible, or ask user to confirm
+            secret_to_purge = input(f"Confirm exact string to redact (Default: {finding.code}): ") or finding.code
+            if len(secret_to_purge) < 8:
+                print_error("String too short to safely purge automatically. Please enter it manually.")
+                secret_to_purge = input("Enter exact secret string: ")
+            
+            if secret_to_purge:
+                purge_string_from_history(secret_to_purge)
+        
+        elif choice == '2':
+            purge_file_from_history(finding.file)
+            
+        elif choice == '3':
+            undo_last_commit()
+            
+        elif choice == '4':
+            continue
+            
+        elif choice == '5':
+            print_info("Remediation workflow aborted.")
+            break
+            
+    print_success("Secret remediation workflow complete.")
+    return True
+
+
 def check_git_installed():
     """Verify git is installed and accessible."""
     try:

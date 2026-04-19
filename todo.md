@@ -32,14 +32,14 @@
 - [x] User prompts for AI features (opt-in only, no nagging)
 
 ## 🚀 Next Steps
-- [ ] Add pre-commit hook integration for automatic security scanning
-- [ ] Implement automatic secret remediation (BFG Repo-Cleaner integration)
+- [x] Add pre-commit hook integration for automatic security scanning
+- [x] Implement automatic secret remediation (BFG Repo-Cleaner integration)
 - [ ] Add security policy enforcement (custom rules, compliance templates)
 - [ ] Create real-time security monitoring dashboard
 - [ ] Implement advanced taint analysis for injection detection
 - [ ] Add CI/CD pipeline integration examples
 - [ ] Create security test suite (unit + integration tests)
-- [ ] Add support for additional LLM providers (OpenAI, Anthropic, Ollama)
+- [x] Add support for additional LLM providers (OpenAI, Anthropic, Ollama)
 - [ ] Implement plugin system for community extensions
 - [ ] Add type hints throughout codebase
 - [ ] Set up automated testing pipeline

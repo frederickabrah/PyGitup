@@ -31,6 +31,13 @@ AI_PROVIDERS = {
         'config_key': 'anthropic_api_key',
         'docs_url': 'https://console.anthropic.com/settings/keys',
         'models': ['claude-3-5-sonnet', 'claude-3-opus']
+    },
+    'ollama': {
+        'name': 'Ollama (Local)',
+        'env_var': 'OLLAMA_BASE_URL',
+        'config_key': 'ollama_base_url',
+        'docs_url': 'https://ollama.ai/',
+        'models': ['llama3', 'mistral', 'codellama']
     }
 }
 

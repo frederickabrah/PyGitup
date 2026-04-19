@@ -11,6 +11,12 @@
 - Graceful JSON parsing fallbacks
 - Improved SHA retrieval
 
+### v2.4.6 - Security Automation & AI Upgrades
+- **Pre-Commit Security Hooks**: Added 'install-hook' and 'uninstall-hook' modes to automate security scans.
+- **Automatic Secret Remediation**: New 'remediate-secrets' workflow for finding and fixing leaked credentials.
+- **Expanded AI Support**: Added support for OpenAI, Anthropic, and Ollama providers.
+- **Improved Security Scan**: Added non-interactive mode for CI/CD integration.
+
 ## 📊 Previous Updates Included:
 
 ### v2.4.4 - Multi-Language SBOM
@@ -38,10 +44,10 @@ pip install --upgrade pygitup
 
 ## 🎯 What's New
 
-**Total Features:** 45+ options  
-**New in v2.4.5:** Inline Help System  
+**Total Features:** 48+ options  
+**New in v2.4.6:** Security Automation, Multi-AI Support  
 **Compatibility:** Android/Termux ✅, Multi-language ✅, Universal Projects ✅
 
 ---
 
-**Full Changelog:** https://github.com/frederickabrah/PyGitUp/compare/v2.4.0...v2.4.5
+**Full Changelog:** https://github.com/frederickabrah/PyGitUp/compare/v2.4.0...v2.4.6

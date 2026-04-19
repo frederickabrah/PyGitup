@@ -69,10 +69,7 @@ def list_available_ai_models(api_key):
             print_error(f"Diagnostic failed for {version}: {e}")
 
 def call_gemini_api(api_key, prompt, timeout=30):
-    """Centralized simple caller with exhaustive model rotation."""
-    if not validate_ai_key(api_key, "AI-powered features"):
-        return None
-        
+    """Google Gemini API Caller."""
     models = [
         ("gemini-3.1-pro-preview", "v1beta"),
         ("gemini-3-pro-preview", "v1beta"),
@@ -84,70 +81,134 @@ def call_gemini_api(api_key, prompt, timeout=30):
         ("gemini-2.0-flash", "v1")
     ]
     
-    last_err = "No successful model connection."
     for model, version in models:
         url = f"https://generativelanguage.googleapis.com/{version}/models/{model}:generateContent"
-        headers = {
-            "x-goog-api-key": api_key,
-            "Content-Type": "application/json"
-        }
+        headers = {"x-goog-api-key": api_key, "Content-Type": "application/json"}
         payload = {"contents": [{"role": "user", "parts": [{"text": prompt}]}]}
         
-        # INCREASED RETRIES with Jittered Backoff
-        for attempt in range(3): 
-            try:
-                resp = requests.post(url, json=payload, headers=headers, timeout=15)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    if data.get('candidates'):
-                        return data['candidates'][0]['content']['parts'][0]['text'].strip()
-                    last_err = f"[{model}] No candidates in response."
-                elif resp.status_code == 429: # Rate limit
-                    wait_time = (2 ** attempt) + 1
-                    print_warning(f"⚠️  Rate limit hit for {model}. Retrying in {wait_time}s...")
-                    time.sleep(wait_time)
-                    continue # Try this model again
-                else:
-                    last_err = f"[{model}] HTTP {resp.status_code}: {resp.text[:100]}"
-                    break # Try next model family
-            except Exception as e:
-                last_err = f"Connection error: {str(e)}"
-                time.sleep(1)
-                continue
-    return f"AI Error: {last_err}"
+        try:
+            resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get('candidates'):
+                    return data['candidates'][0]['content']['parts'][0]['text'].strip()
+        except: continue
+    return None
 
-def generate_ai_commit_message(api_key, diff_text):
+def call_openai_api(api_key, prompt, timeout=30):
+    """OpenAI API Caller with model rotation."""
+    models = ["gpt-4o", "gpt-4-turbo", "gpt-4"]
+    for model in models:
+        url = "https://api.openai.com/v1/chat/completions"
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.7
+        }
+        try:
+            resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
+            if resp.status_code == 200:
+                return resp.json()['choices'][0]['message']['content'].strip()
+        except: continue
+    return None
+
+def call_anthropic_api(api_key, prompt, timeout=30):
+    """Anthropic API Caller with model rotation."""
+    models = ["claude-3-5-sonnet-20240620", "claude-3-opus-20240229"]
+    for model in models:
+        url = "https://api.anthropic.com/v1/messages"
+        headers = {
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": model,
+            "max_tokens": 1024,
+            "messages": [{"role": "user", "content": prompt}]
+        }
+        try:
+            resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
+            if resp.status_code == 200:
+                return resp.json()['content'][0]['text'].strip()
+        except: continue
+    return None
+
+def call_ollama_api(base_url, prompt, timeout=60):
+    """Local Ollama API Caller."""
+    if not base_url: base_url = "http://localhost:11434"
+    url = f"{base_url}/api/generate"
+    payload = {
+        "model": "codellama",
+        "prompt": prompt,
+        "stream": False
+    }
+    try:
+        resp = requests.post(url, json=payload, timeout=timeout)
+        if resp.status_code == 200:
+            return resp.json().get('response', '').strip()
+    except: return None
+    return None
+
+def call_ai_api(config, prompt, provider=None, timeout=30):
+    """Centralized AI API Router."""
+    # 1. Determine Provider
+    if not provider:
+        # Check config for active provider, default to gemini
+        provider = config.get("github", {}).get("ai_provider", "gemini")
+    
+    # 2. Get API Key/URL for provider
+    from .ai_validator import AI_PROVIDERS, get_ai_api_key
+    provider_info = AI_PROVIDERS.get(provider)
+    if not provider_info: return "Error: Unknown Provider"
+    
+    key = get_ai_api_key(provider, config)
+    
+    # 3. Call specific provider
+    if provider == 'gemini':
+        return call_gemini_api(key, prompt, timeout)
+    elif provider == 'openai':
+        return call_openai_api(key, prompt, timeout)
+    elif provider == 'anthropic':
+        return call_anthropic_api(key, prompt, timeout)
+    elif provider == 'ollama':
+        return call_ollama_api(key, prompt, timeout)
+    
+    return "Error: Unsupported Provider"
+
+def generate_ai_commit_message(config, diff_text):
     prompt = f"Write a Conventional Commit for this diff:\n{diff_text[:5000]}"
-    return call_gemini_api(api_key, prompt)
+    return call_ai_api(config, prompt)
 
-def generate_ai_release_notes(api_key, repo_name, commit_history):
-    """Uses Gemini to summarize recent history into a professional release announcement."""
-    if not api_key: return None
+def generate_ai_release_notes(config, repo_name, commit_history):
+    """Uses AI to summarize recent history into a professional release announcement."""
     history_text = "\n".join([f"- {c['commit']['message'].splitlines()[0]}" for c in commit_history[:30]])
     prompt = f"""Write a technical release announcement for '{repo_name}'.\nRECENT CHANGES:\n{history_text}\nNo placeholders."""
-    return call_gemini_api(api_key, prompt)
+    return call_ai_api(config, prompt)
 
-def generate_ai_readme(api_key, project_name, file_list, code_context=""):
-    """Uses Gemini to generate a professional README based on structure and code content."""
+def generate_ai_readme(config, project_name, file_list, code_context=""):
+    """Uses AI to generate a professional README based on structure and code content."""
     prompt = f"Write a professional README.md for '{project_name}'. Structure: {file_list}. Context: {code_context[:5000]}"
-    return call_gemini_api(api_key, prompt)
+    return call_ai_api(config, prompt)
 
-def generate_ai_workflow(api_key, project_name, file_list, code_context=""):
-    """Uses Gemini to architect a custom CI/CD pipeline."""
+def generate_ai_workflow(config, project_name, file_list, code_context=""):
+    """Uses AI to architect a custom CI/CD pipeline."""
     prompt = f"Architect a professional GitHub Actions YAML for '{project_name}'. Structure: {file_list}. Context: {code_context[:5000]}"
-    msg = call_gemini_api(api_key, prompt)
+    msg = call_ai_api(config, prompt)
     if msg and msg.startswith("```"):
         msg = "\n".join(msg.splitlines()[1:-1])
     return msg
 
-def suggest_todo_fix(api_key, todo_text, context_code):
+def suggest_todo_fix(config, todo_text, context_code):
     """Suggests code fix for a TODO using tiered fallback."""
     prompt = f"Suggest a fix for this TODO: \"{todo_text}\" in this context:\n{context_code}"
-    return call_gemini_api(api_key, prompt, timeout=20)
+    return call_ai_api(config, prompt, timeout=20)
 
-def analyze_failed_log(api_key, log_text):
+def analyze_failed_log(config, log_text):
     prompt = f"Identify the bug in this log and provide a fix:\n{log_text[:5000]}"
-    return call_gemini_api(api_key, prompt)
+    return call_ai_api(config, prompt)
+
 
 def compress_history(api_key, history):
     """Distills long history into a technical <state_snapshot> to preserve context."""

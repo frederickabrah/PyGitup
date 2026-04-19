@@ -31,6 +31,7 @@ from .ui.app import run_tui
 from .utils.banner import show_banner
 from .utils.ui import display_menu, print_error, print_success, print_info, console, print_header
 from .utils.update import check_for_updates
+from .utils.hooks import install_pre_commit_hook, uninstall_pre_commit_hook
 from .github.api import github_request, star_repo, follow_user, check_rate_limit
 
 # =============================================================================
@@ -87,6 +88,9 @@ HELP_TEXTS = {
     "purge-string": "Remove sensitive string from git history.",
     "edit-history": "Interactive commit history editor.",
     "remediation-help": "Show help for remediation operations.",
+    "install-hook": "Install pre-commit security scan hook.",
+    "uninstall-hook": "Uninstall pre-commit security scan hook.",
+    "remediate-secrets": "Automatic workflow to find and fix leaked secrets.",
     
     # Tools & Misc (14, 31, 33-34)
     "configure": "Configure PyGitUp credentials and settings.",
@@ -304,6 +308,9 @@ def main():
                     '43': ("✂️  Purge Sensitive String from History", "purge-string"),
                     '44': ("📝 Interactive History Editor (Edit/Delete Commits)", "edit-history"),
                     '45': ("📖 Remediation Help & Guide", "remediation-help"),
+                    '46': ("🛡️  Install Pre-Commit Security Hook", "install-hook"),
+                    '47': ("🗑️  Uninstall Pre-Commit Security Hook", "uninstall-hook"),
+                    '48': ("🛡️  Scan & Remediate Secrets (Auto-Workflow)", "remediate-secrets"),
                     'M': ("📘 View Full User Manual", "manual"),
                     'H': ("❓ Show Help for Feature", "help"),
                     '0': ("Exit PyGitUp", "exit")
@@ -497,28 +504,32 @@ def main():
             elif mode == "security-scan":
                 print_info("🔒 Running Enhanced Security Scan...")
                 
+                # Check for non-interactive mode (for hooks/CI)
+                is_non_interactive = os.environ.get("PYGITUP_NON_INTERACTIVE") == "1"
+                
                 # Prompt for AI enhancement
                 use_ai = False
                 ai_key = config["github"].get("ai_api_key")
                 
-                if not ai_key:
-                    print_info("\n🤖 AI Enhancement Available")
-                    print("AI can provide:")
-                    print("  • Smarter vulnerability analysis")
-                    print("  • Reduced false positives")
-                    print("  • Custom remediation code")
-                    print("\n⚠️  Requires Gemini API key")
-                    
-                    choice = input("\nWould you like to configure AI now? (y/n): ").strip().lower()
-                    if choice in ['y', 'yes']:
-                        print_info("\nTo get a Gemini API key:")
-                        print("  1. Visit: https://makersuite.google.com/app/apikey")
-                        print("  2. Copy your API key")
-                        print("  3. Run Option 14 (Configure) to add it")
-                        print("\nContinuing with rule-based scan only...")
-                else:
-                    ai_choice = input("\n🤖 Use AI to enhance findings? (y/n): ").strip().lower()
-                    use_ai = ai_choice in ['y', 'yes']
+                if not is_non_interactive:
+                    if not ai_key:
+                        print_info("\n🤖 AI Enhancement Available")
+                        print("AI can provide:")
+                        print("  • Smarter vulnerability analysis")
+                        print("  • Reduced false positives")
+                        print("  • Custom remediation code")
+                        print("\n⚠️  Requires Gemini API key")
+                        
+                        choice = input("\nWould you like to configure AI now? (y/n): ").strip().lower()
+                        if choice in ['y', 'yes']:
+                            print_info("\nTo get a Gemini API key:")
+                            print("  1. Visit: https://makersuite.google.com/app/apikey")
+                            print("  2. Copy your API key")
+                            print("  3. Run Option 14 (Configure) to add it")
+                            print("\nContinuing with rule-based scan only...")
+                    else:
+                        ai_choice = input("\n🤖 Use AI to enhance findings? (y/n): ").strip().lower()
+                        use_ai = ai_choice in ['y', 'yes']
                 
                 findings = run_comprehensive_security_scan(".", use_ai=use_ai, config=config)
                 
@@ -536,6 +547,13 @@ def main():
                         },
                         severity="high" if any(f.severity == 'critical' for f in findings) else "info"
                     )
+                    
+                    # Technical Exit for hooks
+                    if is_non_interactive:
+                        critical_findings = [f for f in findings if f.severity in ['critical', 'high']]
+                        if critical_findings:
+                            print_error(f"\n[bold red]FAILURE:[/bold red] Found {len(critical_findings)} critical/high vulnerabilities.")
+                            sys.exit(1)
             elif mode == "token-health":
                 print_info("🔐 Checking Token Health...")
                 if github_token:
@@ -587,6 +605,13 @@ def main():
             elif mode == "remediation-help":
                 from .utils.remediation import show_remediation_help
                 show_remediation_help()
+            elif mode == "install-hook":
+                install_pre_commit_hook()
+            elif mode == "uninstall-hook":
+                uninstall_pre_commit_hook()
+            elif mode == "remediate-secrets":
+                from .utils.remediation import remediate_secrets_workflow
+                remediate_secrets_workflow(config)
             elif mode == "manual":
                 print_header("PyGitUp User Manual")
                 # Try multiple paths to find the manual
