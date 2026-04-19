@@ -16,7 +16,7 @@ RESET = "\033[0m"
 
 # --- THE MEGA COLLECTION (105+ BANNERS: ART + FONTS) ---
 BANNERS = [
-    # --- ARTISTIC / GRAPHICAL BANNERS ---
+    # --- ORIGINAL ARTISTIC / GRAPHICAL BANNERS ---
     rf"""{CYAN}{BOLD}
           .       . 
          / \     / \ 
@@ -447,8 +447,144 @@ __________        ________._____________ ____ ___ __________
     rf"""{RED}{BOLD}
 ||||| PYGITUP |||||
 \\\ AUTOMATION /////
+{RESET}""",
+
+    # --- NEW CREATIVE BANNERS ---
+    rf"""{CYAN}{BOLD}
+   ____  __  ______ _ __  ______  __  __
+  / __ \/ / / / __ (_) /_/ /_  / / / / /
+ / /_/ / /_/ / /_/ / / __/ / / / /_/ / 
+/ .___/\__, /\__, /_/\__/_/ /_/\__,_/  
+/_/   /____//____/                     
+{RESET}""",
+    rf"""{MAGENTA}{BOLD}
+  .---. .---.  .---. .---.  .---. .---. .---. 
+ /  _  \  _  \/  _  \  _  \/  _  \/  _  \/  _  \
+|  (_|  |  |  |  (_|  |  |  |  (_|  |  |  |  (_|  |
+ \_____/|__|  |\_____/|__|  |\_____/|__|  |\_____/|
+{RESET}""",
+    rf"""{BLUE}{BOLD}
+    ____  __  ______  ___  ______  __  ____ 
+   / __ \/ / / / __ \/_  |/_  /  |/  / __ \
+  / /_/ / /_/ / /_/ / / /  / / / /|_/ / /_/ /
+ / .___/\__, /\___\_\/_/  /_/_/ /_/ .___/ 
+/_/    /____/                   /_/      
+{RESET}""",
+    rf"""{GREEN}{BOLD}
+  ___ ___ ___ ___ ___ ___ ___ 
+ | P | Y | G | I | T | U | P |
+ |___|___|___|___|___|___|___|
+{RESET}""",
+    rf"""{YELLOW}{BOLD}
+    _    _    _    _    _    _    _ 
+   / \  / \  / \  / \  / \  / \  / \
+  ( P )( Y )( G )( I )( T )( U )( P )
+   \_/  \_/  \_/  \_/  \_/  \_/  \_/ 
+{RESET}""",
+    rf"""{RED}{BOLD}
+   P Y G I T U P
+  /-------------/
+ /   AUT0MATED /
+/-------------/
+{RESET}""",
+    rf"""{WHITE}{BOLD}
+  ╔═╗╦ ╦╔═╗╦╦╔╦╗╦ ╦╔═╗
+  ╠═╝╚╦╝║ ╦║║ ║ ║ ║╠═╝
+  ╩   ╩ ╚═╝╩╩ ╩ ╚═╝╩  
+{RESET}""",
+    rf"""{CYAN}{BOLD}
+  ⚡ PYGITUP AUTOMATION ⚡
+  ----------------------
+{RESET}""",
+    rf"""{MAGENTA}{BOLD}
+   ▄████████  ▄██████▄  ▄███████▄ 
+  ███    ███ ███    ███ ███    ███ 
+  ███    █▀  ███    ███ ███    ███ 
+  ███        ███    ███ ███    ███ 
+  ███        ███    ███ ███    ███ 
+  ███    █▄  ███    ███ ███    ███ 
+  ███    ███ ███    ███ ███    ███ 
+  ████████▀   ▀██████▀  ███████▀  
+{RESET}""",
+    rf"""{BLUE}{BOLD}
+  ░P░Y░G░I░T░U░P░
+{RESET}""",
+    rf"""{GREEN}{BOLD}
+  /|/|/| PYGITUP |/|/|/
+{RESET}""",
+    rf"""{YELLOW}{BOLD}
+  [ P ] [ Y ] [ G ] [ I ] [ T ] [ U ] [ P ]
+{RESET}""",
+    rf"""{RED}{BOLD}
+  <<< PYGITUP: VERSION 2.4.7 >>>
+{RESET}""",
+    rf"""{WHITE}{BOLD}
+  .-. .-. .-. .-. .-. .-. .-. 
+ |P| |Y| |G| |I| |T| |U| |P| 
+  '-' '-' '-' '-' '-' '-' '-' 
+{RESET}""",
+    rf"""{CYAN}{BOLD}
+  (O) P (O) Y (O) G (O) I (O) T (O) U (O) P (O)
+{RESET}""",
+    rf"""{MAGENTA}{BOLD}
+  * P * Y * G * I * T * U * P *
+{RESET}""",
+    rf"""{BLUE}{BOLD}
+  | P | Y | G | I | T | U | P |
+  -----------------------------
+{RESET}""",
+    rf"""{GREEN}{BOLD}
+  ~ ~ ~ P Y G I T U P ~ ~ ~
+{RESET}""",
+    rf"""{YELLOW}{BOLD}
+  {{ P }} {{ Y }} {{ G }} {{ I }} {{ T }} {{ U }} {{ P }}
+{RESET}""",
+    rf"""{RED}{BOLD}
+  / P / Y / G / I / T / U / P /
+{RESET}""",
+    rf"""{WHITE}{BOLD}
+  _P_ _Y_ _G_ _I_ _T_ _U_ _P_
+{RESET}""",
+    rf"""{CYAN}{BOLD}
+  + P + Y + G + I + T + U + P +
+{RESET}""",
+    rf"""{MAGENTA}{BOLD}
+  PY-GIT-UP :: READY
+{RESET}""",
+    rf"""{BLUE}{BOLD}
+  >> PYGITUP <<
+{RESET}""",
+    rf"""{GREEN}{BOLD}
+  [|||||||||||||||||||]
+  [ PYGITUP IS READY  ]
+  [|||||||||||||||||||]
+{RESET}""",
+    rf"""{YELLOW}{BOLD}
+  ° P ° Y ° G ° I ° T ° U ° P °
+{RESET}""",
+    rf"""{RED}{BOLD}
+  # P # Y # G # I # T # U # P #
+{RESET}""",
+    rf"""{WHITE}{BOLD}
+  = P = Y = G = I = T = U = P =
+{RESET}""",
+    rf"""{CYAN}{BOLD}
+  : P : Y : G : I : T : U : P :
+{RESET}""",
+    rf"""{MAGENTA}{BOLD}
+  ( P ) ( Y ) ( G ) ( I ) ( T ) ( U ) ( P )
+{RESET}""",
+    rf"""{BLUE}{BOLD}
+  < P < Y < G < I < T < U < P <
+{RESET}""",
+    rf"""{GREEN}{BOLD}
+  > P > Y > G > I > T > U > P >
+{RESET}""",
+    rf"""{YELLOW}{BOLD}
+  * PYGITUP *
 {RESET}"""
 ]
+
 
 def show_banner():
     """Displays a random animated banner from the collection."""
