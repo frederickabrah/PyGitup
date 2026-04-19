@@ -180,3 +180,10 @@ RELEASE_NOTES_v*.md
 *.bak
 *~
 cleanup_history.sh
+
+# PyGitUp generated files & artifacts
+build/
+pygitup.egg-info/
+pygitup_security_audit.log
+.pygitup_offline_queue
+todo.md
